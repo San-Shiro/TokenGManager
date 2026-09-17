@@ -48,7 +48,7 @@ dependencies {
 }
 
 android {
-    namespace "${applicationNamespace}.tokeng"
+    namespace "org.tokeng.gms"
 
     compileSdkVersion androidCompileSdk
 //    buildToolsVersion "$androidBuildVersionTools"
@@ -60,7 +60,7 @@ android {
 
 
     defaultConfig {
-        applicationId "${basePackageName}.android.gms.tokeng"
+        applicationId "org.tokeng.android"
 
         versionName version
         versionCode appVersionCode
@@ -80,7 +80,7 @@ android {
         buildConfigField "String", "INCLUDED_PROJECTS", "\"${includeProjects.join(",")}\""
         //noinspection GroovyConstructorNamedArguments
         manifestPlaceholders = [
-                basePackageName: "${basePackageName}.tokeng"
+                basePackageName: "org.tokeng"
         ]
 
         // provide package name to xml resources
@@ -153,6 +153,6 @@ if (file('user.gradle').exists()) {
 
 android.applicationVariants.configureEach { variant ->
     variant.outputs.each { output ->
-        output.outputFileName = "microg-${variant.buildType.name}-${appVersionName}.apk"
+        output.outputFileName = "tokeng-${variant.buildType.name}-${appVersionName}.apk"
     }
 }

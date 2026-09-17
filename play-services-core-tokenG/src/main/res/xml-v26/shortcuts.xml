@@ -7,7 +7,7 @@
         android:shortcutShortLabel="@string/auth_add_account">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetClass="org.microg.gms.auth.login.LoginActivity"
-            android:targetPackage="app.revanced.android.gms" />
+            android:targetClass="org.tokeng.gms.auth.login.LoginActivity"
+            android:targetPackage="org.tokeng.android" />
     </shortcut>
 </shortcuts>

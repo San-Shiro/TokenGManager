@@ -8,7 +8,7 @@
     <!--App Names-->
 
     <string name="gms_app_name" translatable="false">TokenG</string>
-    <string name="gms_settings_name">microG Settings</string>
+    <string name="gms_settings_name">TokenG Settings</string>
 
     <!--Authentication-->
 
@@ -232,7 +232,7 @@ Not yet supported"</string>
     <!--preferences: hide icon in launcher-->
     <string name="pref_hide_launcher_icon">Hide icon in launcher</string>
     <!--preferences: about-->
-    <string name="pref_about_title">About MicroG RE</string>
+    <string name="pref_about_title">About TokenG</string>
     <string name="pref_github" translatable="false">GitHub</string>
     <string name="pref_github_summary">Source code repository</string>
 

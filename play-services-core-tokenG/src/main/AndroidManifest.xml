@@ -56,7 +56,7 @@
 
 
 
-    <uses-permission android:name="${basePackageName}.microg.gms.STATUS_BROADCAST" />
+    <uses-permission android:name="${basePackageName}.gms.STATUS_BROADCAST" />
 
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -88,26 +88,26 @@
         <!-- Services Framework -->
 
         <provider
-            android:name="org.microg.gms.gservices.GServicesProvider"
+            android:name="org.tokeng.gms.gservices.GServicesProvider"
             android:authorities="${basePackageName}.android.gsf.gservices"
             android:exported="true"
             tools:ignore="ExportedContentProvider" />
         <provider
-            android:name="org.microg.gms.settings.GoogleSettingsProvider"
+            android:name="org.tokeng.gms.settings.GoogleSettingsProvider"
             android:authorities="${basePackageName}.settings"
             android:exported="true"
             tools:ignore="ExportedContentProvider" />
 
         <!-- Device Checkin -->
 
-        <service android:name="org.microg.gms.checkin.CheckinService"
+        <service android:name="org.tokeng.gms.checkin.CheckinService"
             tools:ignore="ExportedService,IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="com.google.android.gms.checkin.BIND_TO_SERVICE" />
             </intent-filter>
         </service>
 
-        <receiver android:name="org.microg.gms.checkin.TriggerReceiver"
+        <receiver android:name="org.tokeng.gms.checkin.TriggerReceiver"
             tools:ignore="IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -142,7 +142,7 @@
 
         <!-- Auth -->
 
-        <service android:name="org.microg.gms.auth.loginservice.GoogleLoginService"
+        <service android:name="org.tokeng.gms.auth.loginservice.GoogleLoginService"
             tools:ignore="ExportedService,IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="android.accounts.AccountAuthenticator" />
@@ -160,7 +160,7 @@
         </service>
 
         <activity
-            android:name="org.microg.tools.AccountPickerActivity"
+            android:name="org.tokeng.tools.AccountPickerActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:process=":ui">
@@ -172,7 +172,7 @@
         </activity>
 
         <activity
-            android:name="org.microg.gms.auth.login.LoginActivity"
+            android:name="org.tokeng.gms.auth.login.LoginActivity"
             android:configChanges="uiMode|orientation|keyboardHidden|keyboard|screenSize"
             android:exported="true"
             android:label="@string/auth_add_account"
@@ -187,7 +187,7 @@
         </activity>
 
         <activity
-            android:name="org.microg.gms.auth.AskPermissionActivity"
+            android:name="org.tokeng.gms.auth.AskPermissionActivity"
             android:excludeFromRecents="true"
             android:exported="true"
             android:process=":ui"
@@ -204,13 +204,13 @@
             android:process=":ui" />
 
         <provider
-            android:name="org.microg.gms.auth.AccountContentProvider"
+            android:name="org.tokeng.gms.auth.AccountContentProvider"
             android:authorities="${basePackageName}.android.gms.auth.accounts"
             android:exported="true"
             tools:ignore="ExportedContentProvider" />
 
         <activity
-            android:name="org.microg.gms.auth.credentials.CredentialPickerActivity"
+            android:name="org.tokeng.gms.auth.credentials.CredentialPickerActivity"
             android:exported="true"
             android:process=":ui">
             <intent-filter>
@@ -219,28 +219,28 @@
             </intent-filter>
         </activity>
 
-        <service android:name="org.microg.gms.auth.credentials.CredentialsService"
+        <service android:name="org.tokeng.gms.auth.credentials.CredentialsService"
             tools:ignore="ExportedService,IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="${basePackageName}.android.gms.auth.api.credentials.service.START" />
             </intent-filter>
         </service>
 
-        <service android:name="org.microg.gms.auth.proxy.AuthProxyService"
+        <service android:name="org.tokeng.gms.auth.proxy.AuthProxyService"
             tools:ignore="ExportedService,IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="${basePackageName}.android.gms.auth.service.START" />
             </intent-filter>
         </service>
 
-        <service android:name="org.microg.gms.auth.appcert.AppCertService"
+        <service android:name="org.tokeng.gms.auth.appcert.AppCertService"
             tools:ignore="ExportedService,IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="${basePackageName}.android.gms.auth.be.appcert.AppCertService" />
             </intent-filter>
         </service>
 
-        <service android:name="org.microg.gms.credential.CredentialManagerService"
+        <service android:name="org.tokeng.gms.credential.CredentialManagerService"
             tools:ignore="ExportedService,IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="${basePackageName}.android.gms.credential.manager.service.firstparty.START" />
@@ -248,7 +248,7 @@
         </service>
 
         <activity
-            android:name="org.microg.gms.auth.signin.AuthSignInActivity"
+            android:name="org.tokeng.gms.auth.signin.AuthSignInActivity"
             android:exported="true"
             android:process=":ui"
             android:theme="@style/Theme.Component.Material.AlertDialog">
@@ -258,7 +258,7 @@
             </intent-filter>
         </activity>
 
-        <service android:name="org.microg.gms.signin.SignInService"
+        <service android:name="org.tokeng.gms.signin.SignInService"
             tools:ignore="ExportedService,IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="${basePackageName}.android.gms.signin.service.START" />
@@ -266,7 +266,7 @@
             </intent-filter>
         </service>
 
-        <service android:name="org.microg.gms.auth.signin.AuthSignInService"
+        <service android:name="org.tokeng.gms.auth.signin.AuthSignInService"
             tools:ignore="ExportedService,IntentFilterExportedReceiver">
             <intent-filter>
                 <action android:name="${basePackageName}.android.gms.auth.api.signin.service.START" />
@@ -275,15 +275,15 @@
         </service>
 
         <service
-            android:name="org.microg.gms.auth.signin.SignInConfigurationService"
+            android:name="org.tokeng.gms.auth.signin.SignInConfigurationService"
             android:exported="false" />
 
         <!-- microG Settings activity -->
         <activity
-            android:name="org.microg.gms.ui.MainSettingsActivity"
+            android:name="org.tokeng.gms.ui.MainSettingsActivity"
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
             android:exported="true"
-            android:taskAffinity="org.microg.gms.settings">
+            android:taskAffinity="org.tokeng.gms.settings">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -292,10 +292,10 @@
 
         <!-- Token Manager Activity -->
         <activity
-            android:name="org.microg.gms.tokenmanager.ui.TokenManagerActivity"
+            android:name="org.tokeng.gms.tokenmanager.ui.TokenManagerActivity"
             android:exported="true"
             android:label="Token Manager"
-            android:taskAffinity="org.microg.gms.tokenmanager"
+            android:taskAffinity="org.tokeng.gms.tokenmanager"
             android:theme="@style/AppTheme">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -305,7 +305,7 @@
 
         <!-- Token Manager ContentProvider for external apps -->
         <provider
-            android:name="org.microg.gms.tokenmanager.TokenManagerProvider"
+            android:name="org.tokeng.gms.tokenmanager.TokenManagerProvider"
             android:authorities="${basePackageName}.gms.tokenmanager"
             android:exported="true"
             tools:ignore="ExportedContentProvider" />
@@ -314,9 +314,9 @@
 
         <!-- Allow microG Settings from opening by other applications -->
         <activity-alias
-            android:name="org.microg.gms.ui.SettingsActivity"
+            android:name="org.tokeng.gms.ui.SettingsActivity"
             android:exported="true"
-            android:targetActivity="org.microg.gms.ui.MainSettingsActivity">
+            android:targetActivity="org.tokeng.gms.ui.MainSettingsActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.intent.action.APPLICATION_PREFERENCES" />
@@ -324,20 +324,20 @@
         </activity-alias>
 
         <activity
-            android:name="org.microg.gms.ui.SettingsDashboardActivity"
+            android:name="org.tokeng.gms.ui.SettingsDashboardActivity"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/gms_settings_name"
             android:process=":ui"
             android:roundIcon="@mipmap/ic_launcher_round"
-            android:taskAffinity="org.microg.gms.settings" />
+            android:taskAffinity="org.tokeng.gms.settings" />
 
         <!-- microG Settings embedded in System Settings on SDK 23 and newer -->
         <activity-alias
-            android:name="org.microg.gms.ui.SettingsActivityLink"
+            android:name="org.tokeng.gms.ui.SettingsActivityLink"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/gms_app_name"
-            android:targetActivity="org.microg.gms.ui.MainSettingsActivity">
+            android:targetActivity="org.tokeng.gms.ui.MainSettingsActivity">
             <intent-filter>
                 <action android:name="com.android.settings.action.EXTRA_SETTINGS" />
             </intent-filter>
@@ -357,12 +357,12 @@
         <activity-alias
             android:name="com.google.android.gms.app.settings.GoogleSettingsLink"
             android:exported="true"
-            android:targetActivity="org.microg.gms.ui.MainSettingsActivity">
+            android:targetActivity="org.tokeng.gms.ui.MainSettingsActivity">
         </activity-alias>
 
     <!-- TokenG: AskPushPermissionActivity removed (GCM not available)
         <activity
-            android:name="org.microg.gms.ui.AskPushPermissionActivity"
+            android:name="org.tokeng.gms.ui.AskPushPermissionActivity"
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
             android:excludeFromRecents="true"
             android:noHistory="true"
@@ -371,17 +371,17 @@
         -->
 
         <activity
-            android:name="org.microg.gms.ui.AccountManagerActivity"
+            android:name="org.tokeng.gms.ui.AccountManagerActivity"
             android:label="@string/pref_account_title"
             android:process=":ui"
-            android:taskAffinity="org.microg.gms.settings"
+            android:taskAffinity="org.tokeng.gms.settings"
             android:theme="@style/AppTheme.Login" />
 
         <activity
-            android:name="org.microg.gms.accountsettings.ui.MainActivity"
+            android:name="org.tokeng.gms.accountsettings.ui.MainActivity"
             android:exported="false"
             android:process=":ui"
-            android:taskAffinity="org.microg.gms.settings"
+            android:taskAffinity="org.tokeng.gms.settings"
             android:theme="@style/AppTheme.Login">
             <intent-filter>
                 <action android:name="com.google.android.gms.accountsettings.MY_ACCOUNT" />
@@ -394,9 +394,9 @@
         </activity>
 
         <activity-alias
-            android:name="org.microg.gms.accountsettings.ui.ManagerActivity"
+            android:name="org.tokeng.gms.accountsettings.ui.ManagerActivity"
             android:exported="true"
-            android:targetActivity="org.microg.gms.ui.AccountManagerActivity">
+            android:targetActivity="org.tokeng.gms.ui.AccountManagerActivity">
             <intent-filter tools:ignore="AppLinkUrlError">
                 <action android:name="com.google.android.gms.accountsettings.action.VIEW_SETTINGS" />
                 <action android:name="${basePackageName}.android.gms.accountsettings.action.VIEW_SETTINGS" />
@@ -411,7 +411,7 @@
         <!-- Other -->
 
         <service
-            android:name="org.microg.gms.auth.SignInService"
+            android:name="org.tokeng.gms.auth.SignInService"
             android:exported="true"
             tools:ignore="ExportedService">
             <intent-filter>
@@ -437,12 +437,12 @@
         </service>
 
         <service
-            android:name="org.microg.gms.sync.TokenValidationJobService"
+            android:name="org.tokeng.gms.sync.TokenValidationJobService"
             android:permission="android.permission.BIND_JOB_SERVICE"
             android:exported="false" />
 
         <receiver
-            android:name="org.microg.gms.sync.ValidationBootReceiver"
+            android:name="org.tokeng.gms.sync.ValidationBootReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
@@ -451,7 +451,7 @@
         </receiver>
 
         <meta-data
-            android:name="org.microg.gms.settings.checkin_enable_service"
+            android:name="org.tokeng.gms.settings.checkin_enable_service"
             android:value="true" />
 
     </application>

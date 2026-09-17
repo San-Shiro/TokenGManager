@@ -8,7 +8,7 @@
 
     <fragment
         android:id="@+id/settingsFragment"
-        android:name="org.microg.gms.ui.SettingsFragment"
+        android:name="org.tokeng.gms.ui.SettingsFragment"
         android:label="@string/gms_settings_name">
         <action
             android:id="@+id/openCheckinSettings"
@@ -19,7 +19,7 @@
 
     <fragment
         android:id="@+id/checkinFragment"
-        android:name="org.microg.gms.ui.DeviceRegistrationFragment"
+        android:name="org.tokeng.gms.ui.DeviceRegistrationFragment"
         android:label="@string/service_name_checkin"
         tools:layout="@layout/device_registration_fragment" />
 
@@ -27,14 +27,14 @@
 
     <fragment
         android:id="@+id/accountManagerFragment"
-        android:name="org.microg.gms.ui.UnifiedDashboardFragment"
+        android:name="org.tokeng.gms.ui.UnifiedDashboardFragment"
         android:label="@string/pref_account_title" />
 
     <!-- Token Generator alias to UnifiedDashboardFragment -->
 
     <fragment
         android:id="@+id/tokenGeneratorFragment"
-        android:name="org.microg.gms.ui.UnifiedDashboardFragment"
+        android:name="org.tokeng.gms.ui.UnifiedDashboardFragment"
         android:label="@string/pref_account_title" />
 
 </navigation>

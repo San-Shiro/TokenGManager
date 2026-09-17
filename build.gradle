@@ -5,7 +5,7 @@
 
 buildscript {
     ext.applicationNamespace = "com.google.android.gms"
-    ext.basePackageName = "com.google.gsm.token"
+    ext.basePackageName = "org.tokeng"
 
     ext.annotationVersion = '1.9.1'
     ext.androidXLegacyVersion = '1.0.0'
