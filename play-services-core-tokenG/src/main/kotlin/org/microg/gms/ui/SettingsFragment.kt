@@ -5,31 +5,22 @@
 
 package org.microg.gms.ui
 
-import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.os.PowerManager
 import android.util.Log
 import android.view.View
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.SwitchPreferenceCompat
-// import com.google.android.gms.R
 import com.google.android.gms.tokeng.R
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import com.google.android.material.transition.MaterialSharedAxis
 import kotlinx.coroutines.launch
 import org.microg.gms.checkin.CheckinPreferences
-import org.microg.gms.common.ForegroundServiceOemUtils
-// import org.microg.gms.gcm.GcmDatabase
-// import org.microg.gms.gcm.GcmPrefs
 import org.microg.gms.ui.settings.SettingsProvider
 import org.microg.gms.ui.settings.getAllSettingsProviders
 import org.microg.tools.ui.ResourceSettingsFragment
@@ -39,27 +30,14 @@ class SettingsFragment : ResourceSettingsFragment() {
     companion object {
         private const val TAG = "SettingsFragment"
 
-        const val PREF_ABOUT = "pref_about"
-        const val PREF_GCM = "pref_gcm"
-        const val PREF_PRIVACY = "pref_privacy"
         const val PREF_CHECKIN = "pref_checkin"
         const val PREF_ACCOUNTS = "pref_accounts"
-        const val PREF_TOKEN_GENERATOR = "pref_token_generator"
         const val PREF_HIDE_LAUNCHER_ICON = "pref_hide_launcher_icon"
-        const val PREF_SELF_CHECK = "pref_self_check"
-        const val PREF_GITHUB = "pref_github"
-        const val PREF_IGNORE_BATTERY_OPTIMIZATION = "pref_ignore_battery_optimization"
 
         private const val ACTIVITY_LAUNCHER_CONTROL = "org.microg.gms.ui.SettingsActivityLauncher"
-        private const val PREF_GITHUB_URL = "https://github.com/MorpheApp/MicroG-RE"
     }
 
     private val createdPreferences = mutableListOf<Preference>()
-
-    private val requestIgnoreBatteryOptimizationLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            updateBatteryOptimizationPreference()
-        }
 
     init {
         preferencesResource = R.xml.preferences_start
@@ -69,8 +47,6 @@ class SettingsFragment : ResourceSettingsFragment() {
         super.onCreatePreferences(savedInstanceState, rootKey)
         setupStaticPreferenceClickListeners()
         updateLauncherIconSwitchState()
-        updateBatteryOptimizationPreference()
-        updateAboutSummary()
         loadStaticEntries()
     }
 
@@ -84,9 +60,7 @@ class SettingsFragment : ResourceSettingsFragment() {
         super.onResume()
         activity?.findViewById<ExtendedFloatingActionButton>(R.id.preference_fab)?.visibility =
             View.GONE
-        updateBatteryOptimizationPreference()
         updateLauncherIconSwitchState()
-        updateGcmSummary()
         updateCheckinSummary()
         updateDynamicEntries()
     }
@@ -96,22 +70,8 @@ class SettingsFragment : ResourceSettingsFragment() {
             findNavController().navigate(requireContext(), R.id.accountManagerFragment)
             true
         }
-        findPreference<Preference>(PREF_TOKEN_GENERATOR)?.setOnPreferenceClickListener {
-            findNavController().navigate(requireContext(), R.id.tokenGeneratorFragment)
-            true
-        }
         findPreference<Preference>(PREF_CHECKIN)?.setOnPreferenceClickListener {
             findNavController().navigate(requireContext(), R.id.openCheckinSettings)
-            true
-        }
-        /*
-        findPreference<Preference>(PREF_GCM)?.setOnPreferenceClickListener {
-            findNavController().navigate(requireContext(), R.id.openGcmSettings)
-            true
-        }
-        */
-        findPreference<Preference>(PREF_PRIVACY)?.setOnPreferenceClickListener {
-            findNavController().navigate(requireContext(), R.id.privacyFragment)
             true
         }
         findPreference<SwitchPreferenceCompat>(PREF_HIDE_LAUNCHER_ICON)?.setOnPreferenceChangeListener { _, newValue ->
@@ -119,24 +79,6 @@ class SettingsFragment : ResourceSettingsFragment() {
             toggleLauncherIconVisibility(hide = shouldHide)
             true
         }
-        findPreference<Preference>(PREF_SELF_CHECK)?.setOnPreferenceClickListener {
-            findNavController().navigate(requireContext(), R.id.selfcheckFragment)
-            true
-        }
-        findPreference<Preference>(PREF_GITHUB)?.setOnPreferenceClickListener {
-            openGithub()
-            true
-        }
-        findPreference<Preference>(PREF_ABOUT)?.setOnPreferenceClickListener {
-            findNavController().navigate(requireContext(), R.id.openAbout)
-            true
-        }
-    }
-
-    private fun updateAboutSummary() {
-        findPreference<Preference>(PREF_ABOUT)?.summary = getString(
-            R.string.about_version_str, AboutFragment.getAppVersion(context)
-        )
     }
 
     private fun loadStaticEntries() {
@@ -159,29 +101,6 @@ class SettingsFragment : ResourceSettingsFragment() {
                 if (preference != null) preference.fillFromEntry(entry)
                 else entry.createPreference(ctx)
             }
-        }
-    }
-
-    private val Context.isIgnoringBatteryOptimizations: Boolean
-        get() = (getSystemService(Context.POWER_SERVICE) as? PowerManager)?.isIgnoringBatteryOptimizations(
-            packageName
-        ) == true
-
-    private fun updateBatteryOptimizationPreference() {
-        val ctx = context ?: return
-        findPreference<Preference>(PREF_IGNORE_BATTERY_OPTIMIZATION)?.apply {
-            isVisible = !ctx.isIgnoringBatteryOptimizations
-            setOnPreferenceClickListener {
-                requestIgnoringBatteryOptimizations()
-                true
-            }
-        }
-    }
-
-    private fun requestIgnoringBatteryOptimizations() {
-        val ctx = context ?: return
-        ForegroundServiceOemUtils.openBatteryOptimizationSettings(ctx) { intent ->
-            requestIgnoreBatteryOptimizationLauncher.launch(intent)
         }
     }
 
@@ -210,38 +129,11 @@ class SettingsFragment : ResourceSettingsFragment() {
         findPreference<SwitchPreferenceCompat>(PREF_HIDE_LAUNCHER_ICON)?.isChecked = isHidden
     }
 
-    private fun updateGcmSummary() {
-        /*
-        val context = requireContext()
-        val pref = findPreference<Preference>(PREF_GCM) ?: return
-
-        if (GcmPrefs.get(context).isEnabled) {
-            val database = GcmDatabase(context)
-            val regCount = database.registrationList.size
-            database.close()
-            pref.summary =
-                context.getString(org.microg.gms.base.core.R.string.service_status_enabled_short) + " - " + context.resources.getQuantityString(
-                    R.plurals.gcm_registered_apps_counter, regCount, regCount
-                )
-        } else {
-            pref.setSummary(org.microg.gms.base.core.R.string.service_status_disabled_short)
-        }
-        */
-    }
-
     private fun updateCheckinSummary() {
         val summaryRes =
             if (CheckinPreferences.isEnabled(requireContext())) org.microg.gms.base.core.R.string.service_status_enabled_short
             else org.microg.gms.base.core.R.string.service_status_disabled_short
         findPreference<Preference>(PREF_CHECKIN)?.setSummary(summaryRes)
-    }
-
-    private fun openGithub() {
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, PREF_GITHUB_URL.toUri()))
-        } catch (e: ActivityNotFoundException) {
-            Log.e(TAG, "Error opening link: $PREF_GITHUB_URL", e)
-        }
     }
 
     private fun SettingsProvider.Companion.Entry.createPreference(context: Context): Preference? {

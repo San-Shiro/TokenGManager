@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/nicksrandall/gauth/internal/auth"
 	"github.com/nicksrandall/gauth/internal/config"
@@ -40,11 +43,15 @@ type StatusResponse struct {
 func Start(cfg *config.Config, port int) error {
 	mux := http.NewServeMux()
 
+	// Ring buffer logger (last 500 requests)
+	rl := NewRingLogger(500)
+
 	// Proxy state for browser login
 	proxyState := NewProxyState()
 
 	// Status endpoint
 	mux.HandleFunc("/api/status", func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		resp := StatusResponse{
 			Registered: cfg.HasRegistration(),
 			LoggedIn:   cfg.HasMasterToken(),
@@ -52,6 +59,7 @@ func Start(cfg *config.Config, port int) error {
 			AndroidID:  cfg.AndroidID,
 		}
 		writeJSON(w, http.StatusOK, resp)
+		rl.Info("/api/status", r.Method, 200, "status check", time.Since(start), r.RemoteAddr)
 	})
 
 	// Login status poll endpoint (for browser login page)
@@ -83,13 +91,16 @@ func Start(cfg *config.Config, port int) error {
 
 	// Fetch token endpoint
 	mux.HandleFunc("/api/token", func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		if r.Method != "POST" && r.Method != "GET" {
 			writeJSON(w, http.StatusMethodNotAllowed, TokenResponse{Error: "use POST or GET"})
+			rl.Error("/api/token", r.Method, 405, "method not allowed", time.Since(start), r.RemoteAddr)
 			return
 		}
 
 		if !cfg.HasMasterToken() {
 			writeJSON(w, http.StatusUnauthorized, TokenResponse{Error: "not logged in; use /login or run 'gauth login' first"})
+			rl.Error("/api/token", r.Method, 401, "not logged in", time.Since(start), r.RemoteAddr)
 			return
 		}
 
@@ -98,6 +109,7 @@ func Start(cfg *config.Config, port int) error {
 		if r.Method == "POST" {
 			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 				writeJSON(w, http.StatusBadRequest, TokenResponse{Error: "invalid JSON: " + err.Error()})
+				rl.Error("/api/token", r.Method, 400, "invalid JSON: "+err.Error(), time.Since(start), r.RemoteAddr)
 				return
 			}
 		} else {
@@ -107,6 +119,7 @@ func Start(cfg *config.Config, port int) error {
 		}
 
 		// Resolve known app shortcuts
+		origScope := req.Scope
 		if app, ok := auth.KnownApps[req.Scope]; ok {
 			req.Scope = app.Scope
 			if req.AppPackage == "" {
@@ -116,6 +129,7 @@ func Start(cfg *config.Config, port int) error {
 
 		if req.Scope == "" {
 			writeJSON(w, http.StatusBadRequest, TokenResponse{Error: "scope is required. Try: photos, youtube, gmail, drive, or a full OAuth2 scope"})
+			rl.Error("/api/token", r.Method, 400, "missing scope", time.Since(start), r.RemoteAddr)
 			return
 		}
 
@@ -131,11 +145,13 @@ func Start(cfg *config.Config, port int) error {
 		if err != nil {
 			log.Printf("[server] Token fetch error: %v", err)
 			writeJSON(w, http.StatusInternalServerError, TokenResponse{Error: err.Error()})
+			rl.Error("/api/token", r.Method, 500, "fetch error: "+err.Error(), time.Since(start), r.RemoteAddr)
 			return
 		}
 
 		if resp.Auth == "" {
 			writeJSON(w, http.StatusInternalServerError, TokenResponse{Error: "empty token in response"})
+			rl.Error("/api/token", r.Method, 500, "empty token", time.Since(start), r.RemoteAddr)
 			return
 		}
 
@@ -152,6 +168,13 @@ func Start(cfg *config.Config, port int) error {
 			TokenType:     tokenType,
 			GrantedScopes: resp.GrantedScopes,
 		})
+
+		// Truncate token for log
+		tokPreview := resp.Auth
+		if len(tokPreview) > 15 {
+			tokPreview = tokPreview[:10] + "..." + tokPreview[len(tokPreview)-5:]
+		}
+		rl.Info("/api/token", r.Method, 200, fmt.Sprintf("scope=%s type=%s token=%s", origScope, tokenType, tokPreview), time.Since(start), r.RemoteAddr)
 	})
 
 	// Known apps list
@@ -164,6 +187,28 @@ func Start(cfg *config.Config, port int) error {
 			}
 		}
 		writeJSON(w, http.StatusOK, apps)
+		rl.Info("/api/apps", r.Method, 200, "apps list", 0, r.RemoteAddr)
+	})
+
+	// === LOGS API ===
+	// Retrieve recent request logs
+	mux.HandleFunc("/api/logs", func(w http.ResponseWriter, r *http.Request) {
+		limit := 100 // default
+		if l := r.URL.Query().Get("limit"); l != "" {
+			if n, err := strconv.Atoi(l); err == nil && n > 0 {
+				limit = n
+			}
+		}
+		entries := rl.Entries(limit)
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"count":   len(entries),
+			"entries": entries,
+		})
+	})
+
+	// Log statistics
+	mux.HandleFunc("/api/logs/stats", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, rl.Stats())
 	})
 
 	// === BROWSER LOGIN FLOW ===
@@ -179,9 +224,31 @@ func Start(cfg *config.Config, port int) error {
 	// Static resource proxy
 	mux.Handle("/gproxy/", staticProxyHandler(cfg, port))
 
-	// Web UI (existing)
+	// Web UI (existing) + catch-all for Google paths that bypass /glogin/
+	// Google's JS sometimes constructs URLs relative to the origin, skipping
+	// our /glogin/ prefix. We catch known Google Accounts paths and proxy them.
+	googlePaths := []string{
+		"/lifecycle/", "/v3/", "/signin/", "/o/",
+		"/speedbump/", "/webreauth/", "/challenge/",
+		"/AccountChooser", "/ServiceLogin",
+		"/embedded/", "/CheckCookie",
+	}
+	googleProxy := googleProxyHandler(cfg, proxyState, port)
+
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
+		path := r.URL.Path
+
+		// Check if this looks like a Google Accounts path
+		for _, prefix := range googlePaths {
+			if strings.HasPrefix(path, prefix) {
+				// Rewrite to /glogin/... and serve through proxy
+				r.URL.Path = "/glogin" + path
+				googleProxy.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		if path != "/" {
 			http.NotFound(w, r)
 			return
 		}
@@ -197,6 +264,8 @@ func Start(cfg *config.Config, port int) error {
 	log.Printf("  POST /api/token      {\"scope\": \"photos\"}")
 	log.Printf("  GET  /api/token?scope=photos")
 	log.Printf("  GET  /api/apps")
+	log.Printf("  GET  /api/logs       — Request logs (last 500)")
+	log.Printf("  GET  /api/logs/stats — Log statistics")
 
 	return http.ListenAndServe(addr, mux)
 }

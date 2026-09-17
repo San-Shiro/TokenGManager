@@ -13,20 +13,7 @@
         <action
             android:id="@+id/openCheckinSettings"
             app:destination="@id/checkinFragment" />
-        <action
-            android:id="@+id/openGcmSettings"
-            app:destination="@id/gcmFragment" />
-        <action
-            android:id="@+id/openAbout"
-            app:destination="@id/aboutFragment" />
     </fragment>
-
-    <!-- Self-Check -->
-
-    <fragment
-        android:id="@+id/selfcheckFragment"
-        android:name="org.microg.gms.ui.SelfCheckFragment"
-        android:label="@string/self_check_title" />
 
     <!-- Device registration -->
 
@@ -36,74 +23,18 @@
         android:label="@string/service_name_checkin"
         tools:layout="@layout/device_registration_fragment" />
 
-    <!-- Account manager-->
+    <!-- Unified Accounts & Token Manager -->
 
     <fragment
         android:id="@+id/accountManagerFragment"
-        android:name="org.microg.gms.ui.AccountsFragment"
+        android:name="org.microg.gms.ui.UnifiedDashboardFragment"
         android:label="@string/pref_account_title" />
 
-    <!-- Privacy-->
-
-    <fragment
-        android:id="@+id/privacyFragment"
-        android:name="org.microg.gms.ui.PrivacyFragment"
-        android:label="@string/pref_privacy_title" />
-
-    <!-- Push Notifications -->
-
-    <fragment
-        android:id="@+id/gcmFragment"
-        android:name="org.microg.gms.ui.PushNotificationFragment"
-        android:label="@string/service_name_mcs"
-        tools:layout="@layout/push_notification_fragment">
-        <action
-            android:id="@+id/openGcmAppDetails"
-            app:destination="@id/gcmAppFragment" />
-        <action
-            android:id="@+id/openAllGcmApps"
-            app:destination="@id/gcmAllAppsFragment" />
-        <action
-            android:id="@+id/openGcmAdvancedSettings"
-            app:destination="@id/gcmAdvancedFragment" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/gcmAllAppsFragment"
-        android:name="org.microg.gms.ui.PushNotificationAllAppsFragment"
-        android:label="@string/prefcat_push_apps_title">
-        <action
-            android:id="@+id/openGcmAppDetailsFromAll"
-            app:destination="@id/gcmAppFragment" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/gcmAppFragment"
-        android:name="org.microg.gms.ui.PushNotificationAppFragment"
-        android:label="@string/service_name_mcs"
-        tools:layout="@layout/push_notification_app_fragment">
-        <argument
-            android:name="package"
-            app:argType="string" />
-    </fragment>
-
-    <fragment
-        android:id="@+id/gcmAdvancedFragment"
-        android:name="org.microg.gms.ui.PushNotificationAdvancedFragment"
-        android:label="@string/menu_settings" />
-
-    <!-- Token Generator -->
+    <!-- Token Generator alias to UnifiedDashboardFragment -->
 
     <fragment
         android:id="@+id/tokenGeneratorFragment"
-        android:name="org.microg.gms.ui.TokenGeneratorFragment"
-        android:label="Token Generator" />
+        android:name="org.microg.gms.ui.UnifiedDashboardFragment"
+        android:label="@string/pref_account_title" />
 
-    <!-- About -->
-
-    <fragment
-        android:id="@+id/aboutFragment"
-        android:name="org.microg.gms.ui.AboutFragment"
-        android:label="@string/prefcat_about"
-        tools:layout="@layout/about_root" />
 </navigation>

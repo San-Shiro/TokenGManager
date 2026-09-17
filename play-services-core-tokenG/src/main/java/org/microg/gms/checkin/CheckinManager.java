@@ -40,27 +40,66 @@ public class CheckinManager {
 
     @SuppressWarnings("MissingPermission")
     public static synchronized LastCheckinInfo checkin(Context context, boolean force) throws IOException {
+        return checkin(context, force, null);
+    }
+
+    @SuppressWarnings("MissingPermission")
+    public static synchronized LastCheckinInfo checkin(Context context, boolean force, org.microg.gms.profile.MultiDeviceRegistry.DevicePreset preset) throws IOException {
         LastCheckinInfo info = LastCheckinInfo.read(context);
         if (!force && info.getLastCheckin() > System.currentTimeMillis() - MIN_CHECKIN_INTERVAL)
             return null;
         if (!CheckinPreferences.isEnabled(context))
             return null;
         List<CheckinClient.Account> accounts = new ArrayList<CheckinClient.Account>();
-        AccountManager accountManager = AccountManager.get(context);
-        String accountType = AuthConstants.DEFAULT_ACCOUNT_TYPE;
-        for (Account account : accountManager.getAccountsByType(accountType)) {
-            String token = new AuthRequest()
-                    .email(account.name).token(accountManager.getPassword(account))
-                    .hasPermission(true).service("ac2dm")
-                    .app("com.google.android.gsf", Constants.GMS_PACKAGE_SIGNATURE_SHA1)
-                    .getResponse().LSid;
-            if (token != null) {
-                accounts.add(new CheckinClient.Account(account.name, token));
+        try {
+            List<org.microg.gms.database.TokenAccount> dbAccounts = org.microg.gms.database.TokenDatabase.getInstance(context).getAllAccounts();
+            for (org.microg.gms.database.TokenAccount account : dbAccounts) {
+                String token = account.getLsid();
+                if (token == null || token.isEmpty()) {
+                    token = new AuthRequest()
+                            .email(account.getEmail()).token(account.getMasterToken())
+                            .hasPermission(true).service("ac2dm")
+                            .app("com.google.android.gsf", Constants.GMS_PACKAGE_SIGNATURE_SHA1)
+                            .getResponse().LSid;
+                }
+                if (token != null) {
+                    accounts.add(new CheckinClient.Account(account.getEmail(), token));
+                }
+            }
+        } catch (Exception ignored) {}
+
+        if (accounts.isEmpty()) {
+            AccountManager accountManager = AccountManager.get(context);
+            String accountType = AuthConstants.DEFAULT_ACCOUNT_TYPE;
+            for (Account account : accountManager.getAccountsByType(accountType)) {
+                String token = new AuthRequest()
+                        .email(account.name).token(accountManager.getPassword(account))
+                        .hasPermission(true).service("ac2dm")
+                        .app("com.google.android.gsf", Constants.GMS_PACKAGE_SIGNATURE_SHA1)
+                        .getResponse().LSid;
+                if (token != null) {
+                    accounts.add(new CheckinClient.Account(account.name, token));
+                }
             }
         }
         CheckinRequest request = CheckinClient.makeRequest(context,
                 new DeviceConfiguration(context), Utils.getDeviceIdentifier(context),
-                Utils.getPhoneInfo(context), info, Utils.getLocale(context), accounts, isSpoofingEnabled(context));
+                Utils.getPhoneInfo(context), info, Utils.getLocale(context), accounts, preset, isSpoofingEnabled(context));
+        return handleResponse(context, CheckinClient.request(request));
+    }
+
+
+    /**
+     * Perform fresh device check-in (androidId=0) to obtain a brand-new GSF ID and security token
+     * bound to the allocated device preset.
+     */
+    @SuppressWarnings("MissingPermission")
+    public static synchronized LastCheckinInfo checkinFresh(Context context, org.microg.gms.profile.MultiDeviceRegistry.DevicePreset preset) throws IOException {
+        LastCheckinInfo freshInfo = new LastCheckinInfo(0, 0, 0, org.microg.gms.settings.SettingsContract.CheckIn.INITIAL_DIGEST, "", "");
+        List<CheckinClient.Account> accounts = new ArrayList<CheckinClient.Account>();
+        CheckinRequest request = CheckinClient.makeRequest(context,
+                new DeviceConfiguration(context), Utils.getDeviceIdentifier(context),
+                Utils.getPhoneInfo(context), freshInfo, Utils.getLocale(context), accounts, preset, true);
         return handleResponse(context, CheckinClient.request(request));
     }
 

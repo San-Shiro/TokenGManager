@@ -71,9 +71,17 @@ public class TokenGeneratorFragment extends PreferenceFragmentCompat {
         PreferenceScreen screen = getPreferenceManager().createPreferenceScreen(context);
         setPreferenceScreen(screen);
 
-        // Get Google Accounts
-        AccountManager am = AccountManager.get(context);
-        availableAccounts = am.getAccountsByType(AuthConstants.DEFAULT_ACCOUNT_TYPE);
+        // Get Google Accounts from TokenDatabase or AccountManager
+        java.util.List<org.microg.gms.database.TokenAccount> dbAccounts = org.microg.gms.database.TokenDatabase.getInstance(context).getAllAccounts();
+        if (!dbAccounts.isEmpty()) {
+            availableAccounts = new Account[dbAccounts.size()];
+            for (int i = 0; i < dbAccounts.size(); i++) {
+                availableAccounts[i] = new Account(dbAccounts.get(i).getEmail(), AuthConstants.DEFAULT_ACCOUNT_TYPE);
+            }
+        } else {
+            AccountManager am = AccountManager.get(context);
+            availableAccounts = am.getAccountsByType(AuthConstants.DEFAULT_ACCOUNT_TYPE);
+        }
 
         if (availableAccounts.length == 0) {
             Preference errorPref = new Preference(context);

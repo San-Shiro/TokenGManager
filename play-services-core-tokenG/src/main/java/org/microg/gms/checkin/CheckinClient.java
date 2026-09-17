@@ -24,6 +24,7 @@ import org.microg.gms.common.DeviceIdentifier;
 import org.microg.gms.common.PhoneInfo;
 import org.microg.gms.common.Utils;
 import org.microg.gms.profile.Build;
+import org.microg.gms.profile.MultiDeviceRegistry;
 import org.microg.gms.profile.ProfileManager;
 
 import java.io.IOException;
@@ -82,26 +83,45 @@ public class CheckinClient {
                                              DeviceIdentifier deviceIdent, PhoneInfo phoneInfo,
                                              LastCheckinInfo checkinInfo, Locale locale,
                                              List<Account> accounts, Boolean brandSpoof) {
+        return makeRequest(context, deviceConfiguration, deviceIdent, phoneInfo, checkinInfo, locale, accounts, null, brandSpoof);
+    }
+
+    public static CheckinRequest makeRequest(Context context, DeviceConfiguration deviceConfiguration,
+                                             DeviceIdentifier deviceIdent, PhoneInfo phoneInfo,
+                                             LastCheckinInfo checkinInfo, Locale locale,
+                                             List<Account> accounts, MultiDeviceRegistry.DevicePreset preset,
+                                             Boolean brandSpoof) {
         ProfileManager.ensureInitialized(context);
+        String bootloader = preset != null ? preset.getBootloader() : (brandSpoof ? "c2f2-0.2-5799621" : Build.BOOTLOADER);
+        String brand = preset != null ? preset.getBrand() : (brandSpoof ? "google" : Build.BRAND);
+        String device = preset != null ? preset.getDevice() : (brandSpoof ? "generic" : Build.DEVICE);
+        String fingerprint = preset != null ? preset.getFingerprint() : (brandSpoof ? "google/coral/coral:10/QD1A.190821.007/5831595:user/release-keys" : Build.FINGERPRINT);
+        String hardware = preset != null ? preset.getHardware() : (brandSpoof ? "coral" : Build.HARDWARE);
+        String manufacturer = preset != null ? preset.getManufacturer() : (brandSpoof ? "Google" : Build.MANUFACTURER);
+        String model = preset != null ? preset.getModel() : (brandSpoof ? "mainline" : Build.MODEL);
+        String product = preset != null ? preset.getProduct() : (brandSpoof ? "coral" : Build.PRODUCT);
+        int sdk = preset != null ? preset.getSdkVersion() : (brandSpoof ? 29 : Build.VERSION.SDK_INT);
+        long time = preset != null ? preset.getBuildTime() : (Build.TIME / 1000);
+
         CheckinRequest.Builder builder = new CheckinRequest.Builder()
                 .accountCookie(new ArrayList<>())
                 .androidId(checkinInfo.getAndroidId())
                 .checkin(new CheckinRequest.Checkin.Builder()
                         .build(new CheckinRequest.Checkin.Build.Builder()
-                                .bootloader(brandSpoof ? "c2f2-0.2-5799621" : Build.BOOTLOADER)
-                                .brand(brandSpoof ? "google" : Build.BRAND)
+                                .bootloader(bootloader)
+                                .brand(brand)
                                 .clientId("android-google")
-                                .device(brandSpoof ? "generic" : Build.DEVICE)
-                                .fingerprint(brandSpoof ? "google/coral/coral:10/QD1A.190821.007/5831595:user/release-keys" : Build.FINGERPRINT)
-                                .hardware(brandSpoof ? "coral" : Build.HARDWARE)
-                                .manufacturer(brandSpoof ? "Google" : Build.MANUFACTURER)
-                                .model(brandSpoof ? "mainline" : Build.MODEL)
+                                .device(device)
+                                .fingerprint(fingerprint)
+                                .hardware(hardware)
+                                .manufacturer(manufacturer)
+                                .model(model)
                                 .otaInstalled(false) // TODO?
                                 //.packageVersionCode(Constants.MAX_REFERENCE_VERSION)
-                                .product(brandSpoof ? "coral" : Build.PRODUCT)
+                                .product(product)
                                 .radio(brandSpoof ? "" : Build.RADIO)
-                                .sdkVersion(brandSpoof ? 29 : Build.VERSION.SDK_INT)
-                                .time(Build.TIME / 1000)
+                                .sdkVersion(sdk)
+                                .time(time)
                                 .build())
                         .cellOperator(phoneInfo.cellOperator)
                         .event(Collections.singletonList(new CheckinRequest.Checkin.Event.Builder()

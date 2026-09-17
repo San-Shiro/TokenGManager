@@ -135,6 +135,11 @@ public class TokenManagerProvider extends ContentProvider {
             return null;
         }
 
+        org.microg.gms.database.TokenAccount dbAccount = org.microg.gms.database.TokenDatabase.getInstance(getContext()).getAccount(email);
+        if (dbAccount != null) {
+            return new Account(dbAccount.getEmail(), AuthConstants.DEFAULT_ACCOUNT_TYPE);
+        }
+
         AccountManager am = AccountManager.get(getContext());
         Account[] accounts = am.getAccountsByType(AuthConstants.DEFAULT_ACCOUNT_TYPE);
 

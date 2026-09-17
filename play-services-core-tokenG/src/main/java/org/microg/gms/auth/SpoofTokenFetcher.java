@@ -55,6 +55,12 @@ public class SpoofTokenFetcher {
         Log.i(TAG, "Retrieving stored Master Token...");
         AccountManager accountManager = AccountManager.get(context);
         String masterToken = accountManager.getPassword(account);
+        if (masterToken == null || masterToken.isEmpty()) {
+            org.microg.gms.database.TokenAccount dbAcct = org.microg.gms.database.TokenDatabase.getInstance(context).getAccount(account.name);
+            if (dbAcct != null) {
+                masterToken = dbAcct.getMasterToken();
+            }
+        }
 
         if (masterToken != null && !masterToken.isEmpty()) {
             Log.i(TAG, "Master Token retrieved successfully (length: " + masterToken.length() + ")");
@@ -89,9 +95,13 @@ public class SpoofTokenFetcher {
         Log.i(TAG, "Fetching custom token for: " + packageName + " | Scope: " + scope);
 
         try {
-            // 1. Get Master token from AccountManager (the stored password)
+            // 1. Get Master token from AccountManager or TokenDatabase
+            org.microg.gms.database.TokenAccount dbAcct = org.microg.gms.database.TokenDatabase.getInstance(context).getAccount(account.name);
             AccountManager accountManager = AccountManager.get(context);
             String masterToken = accountManager.getPassword(account);
+            if ((masterToken == null || masterToken.isEmpty()) && dbAcct != null) {
+                masterToken = dbAcct.getMasterToken();
+            }
 
             if (masterToken == null || masterToken.isEmpty()) {
                 return "ERROR: No master token found. Please re-login to your Google account.";
@@ -100,8 +110,12 @@ public class SpoofTokenFetcher {
             Log.i(TAG, "Using master token (length: " + masterToken.length() + ")");
 
             // 2. Construct the spoofed request with full app identity
+            org.microg.gms.profile.MultiDeviceRegistry.DevicePreset preset = null;
+            if (dbAcct != null) {
+                preset = org.microg.gms.profile.MultiDeviceRegistry.INSTANCE.getPresetByModel(dbAcct.getDeviceModel());
+            }
             AuthRequest request = new AuthRequest()
-                    .fromContext(context) // Auto-sets Android ID, SDK version, locale, etc.
+                    .fromContext(context, preset) // Auto-sets Android ID, SDK version, locale, etc.
                     .email(account.name) // Account email
                     .token(masterToken) // Master AES token for authentication
                     .service(scope) // The OAuth2 scope we're requesting
@@ -109,6 +123,9 @@ public class SpoofTokenFetcher {
                     .caller(packageName, signature) // Also set caller to same app
                     .systemPartition(true) // Claim to be system app
                     .hasPermission(true); // Already have permission
+            if (dbAcct != null && dbAcct.getAndroidId() != null && !dbAcct.getAndroidId().isEmpty()) {
+                request.androidIdHex = dbAcct.getAndroidId();
+            }
 
             // 3. Execute the request to Google's auth server
             Log.i(TAG, "Sending request to Google auth server...");

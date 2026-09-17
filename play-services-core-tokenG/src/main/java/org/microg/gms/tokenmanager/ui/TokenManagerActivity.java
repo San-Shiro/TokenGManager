@@ -14,19 +14,20 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
-// import com.google.android.gms.R;
 import com.google.android.gms.tokeng.R;
-
 import org.microg.gms.ui.MainSettingsActivity;
+import org.microg.gms.ui.UnifiedDashboardFragment;
 
 /**
  * Standalone Token Manager Activity.
- * Can be set as launcher activity alongside microG Settings.
+ * Launcher activity hosting the Unified Accounts & Device Dashboard.
  */
 public class TokenManagerActivity extends AppCompatActivity {
 
+    private com.google.android.material.tabs.TabLayoutMediator tabLayoutMediator;
+
     @Override
-    protected void onCreate(@Nullable Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_token_manager);
 
@@ -37,13 +38,50 @@ public class TokenManagerActivity extends AppCompatActivity {
             getSupportActionBar().setTitle("Token Manager");
         }
 
-        // Load fragment
-        if (savedInstanceState == null) {
-            getSupportFragmentManager()
-                    .beginTransaction()
-                    .replace(R.id.fragment_container, new TokenManagerFragment())
-                    .commit();
+        // Set up ViewPager2 with TabLayoutMediator for smooth, blink-free tab sliding
+        androidx.viewpager2.widget.ViewPager2 viewPager = findViewById(R.id.view_pager);
+        com.google.android.material.tabs.TabLayout tabLayout = findViewById(R.id.tab_layout);
+
+        if (viewPager != null && tabLayout != null) {
+            viewPager.setOffscreenPageLimit(1);
+            viewPager.setAdapter(new androidx.viewpager2.adapter.FragmentStateAdapter(this) {
+                @androidx.annotation.NonNull
+                @Override
+                public androidx.fragment.app.Fragment createFragment(int position) {
+                    if (position == 0) {
+                        return new UnifiedDashboardFragment();
+                    } else {
+                        return new org.microg.gms.ui.SyncStatusFragment();
+                    }
+                }
+
+                @Override
+                public int getItemCount() {
+                    return 2;
+                }
+            });
+
+            tabLayoutMediator = new com.google.android.material.tabs.TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
+                if (position == 0) {
+                    tab.setText("Accounts").setIcon(R.drawable.ic_accounts);
+                } else {
+                    tab.setText("Cloud Sync").setIcon(R.drawable.ic_sync);
+                }
+            });
+            tabLayoutMediator.attach();
         }
+
+        // Ensure background token validation job is registered
+        org.microg.gms.sync.TokenValidationJobService.Companion.schedule(this);
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (tabLayoutMediator != null) {
+            tabLayoutMediator.detach();
+            tabLayoutMediator = null;
+        }
+        super.onDestroy();
     }
 
     @Override

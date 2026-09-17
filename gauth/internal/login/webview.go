@@ -1,3 +1,5 @@
+//go:build windows
+
 // Package login provides WebView-based Google login.
 // Uses jchv/go-webview2 (pure Go, Windows only) for WebView2 support.
 package login

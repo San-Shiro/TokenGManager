@@ -2,58 +2,16 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <Preference
-        android:key="pref_ignore_battery_optimization"
-        android:persistent="false"
-        android:summary="@string/self_check_resolution_battery_optimizations"
-        android:title="@string/cond_gcm_bat_action"
-        app:iconSpaceReserved="false"
-        app:layout="@layout/preference_material_battery_optimization" />
-
-    <Preference
         android:icon="@drawable/ic_accounts"
         android:key="pref_accounts"
         android:layout="@layout/preference_material_top"
-        android:summary="@string/pref_accounts_summary"
-        android:title="@string/pref_account_title" />
+        android:summary="Manage Google accounts, device registrations &amp; 1P AES tokens"
+        android:title="Accounts &amp; Token Manager" />
 
-    <Preference
-        android:key="pref_token_generator"
-        android:icon="@android:drawable/ic_lock_lock"
-        android:layout="@layout/preference_material_middle"
-        android:title="Photos Token Generator"
-        android:summary="Generate 1P AES Token" />
     <Preference
         android:icon="@drawable/ic_device_login"
         android:key="pref_checkin"
-        android:layout="@layout/preference_material_middle"
+        android:layout="@layout/preference_material_bottom"
         android:title="@string/service_name_checkin" />
 
-    <Preference
-        android:icon="@drawable/ic_privacy"
-        android:key="pref_privacy"
-        android:layout="@layout/preference_material_middle"
-        android:summary="@string/pref_privacy_summary"
-        android:title="@string/pref_privacy_title" />
-
-
-
-    <Preference
-        android:icon="@drawable/ic_self_check"
-        android:layout="@layout/preference_material_middle"
-        android:title="@string/self_check_title"
-        android:summary="@string/self_check_desc"
-        android:key="pref_self_check" />
-
-    <Preference
-        android:icon="@drawable/ic_github"
-        android:key="pref_github"
-        android:layout="@layout/preference_material_middle"
-        android:summary="@string/pref_github_summary"
-        android:title="@string/pref_github" />
-
-    <Preference
-        android:icon="@drawable/ic_information"
-        android:key="pref_about"
-        android:layout="@layout/preference_material_bottom"
-        android:title="@string/pref_about_title" />
 </PreferenceScreen>

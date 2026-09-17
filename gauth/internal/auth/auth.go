@@ -35,27 +35,33 @@ type Response struct {
 }
 
 // ExchangeOAuthForMaster exchanges a one-time OAuth token for a master token.
-// This is the Step 3 from MicroG's LoginActivity.retrieveRtToken().
+// Matches MicroG's LoginActivity.retrieveRtToken() exactly.
 func ExchangeOAuthForMaster(cfg *config.Config, oauthToken string) (*Response, error) {
+	// MicroG sends real androidId when available, "null" otherwise
+	androidId := "null"
+	if cfg.AndroidID != "" {
+		androidId = cfg.AndroidID
+	}
+
 	form := url.Values{
-		"androidId":                      {cfg.AndroidID},
-		"sdk_version":                    {fmt.Sprintf("%d", cfg.Device.SDKVersion)},
-		"device_country":                 {"us"},
-		"operatorCountry":                {"us"},
-		"lang":                           {"en_US"},
-		"google_play_services_version":   {"224714044"},
-		"accountType":                    {"HOSTED_OR_GOOGLE"},
-		"service":                        {"ac2dm"},
-		"source":                         {"android"},
-		"app":                            {"com.google.android.gms"},
-		"client_sig":                     {"38918a453d07199354f8b19af05ec6562ced5788"},
-		"callerPkg":                      {"com.google.android.gms"},
-		"callerSig":                      {"38918a453d07199354f8b19af05ec6562ced5788"},
-		"Token":                          {oauthToken},
-		"ACCESS_TOKEN":                   {"1"},
-		"add_account":                    {"1"},
-		"get_accountid":                  {"1"},
-		"is_called_from_account_manager": {"1"},
+		"androidId":                    {androidId},
+		"sdk_version":                  {fmt.Sprintf("%d", cfg.Device.SDKVersion)},
+		"device_country":               {"us"},
+		"operatorCountry":              {"us"},
+		"lang":                         {"en_US"},
+		"google_play_services_version": {"255034000"},
+		"accountType":                  {"HOSTED_OR_GOOGLE"},
+		"service":                      {"ac2dm"},
+		// MicroG does NOT send 'source' in retrieveRtToken
+		"app":           {"com.google.android.gms"},
+		"client_sig":    {"38918a453d07199354f8b19af05ec6562ced5788"},
+		"callerPkg":     {"com.google.android.gms"},
+		"callerSig":     {"38918a453d07199354f8b19af05ec6562ced5788"},
+		"Token":         {oauthToken},
+		"ACCESS_TOKEN":  {"1"},
+		"add_account":   {"1"},
+		"get_accountid": {"1"},
+		// MicroG does NOT send 'is_called_from_account_manager' in retrieveRtToken
 	}
 
 	return doAuthRequest(cfg, form)
@@ -74,7 +80,7 @@ func FetchServiceToken(cfg *config.Config, scope, appPackage, appSig string) (*R
 		"device_country":               {"us"},
 		"operatorCountry":              {"us"},
 		"lang":                         {"en_US"},
-		"google_play_services_version": {"224714044"},
+		"google_play_services_version": {"255034000"},
 		"accountType":                  {"HOSTED_OR_GOOGLE"},
 		"Email":                        {cfg.Email},
 		"service":                      {scope},
@@ -113,11 +119,12 @@ func doAuthRequest(cfg *config.Config, form url.Values) (*Response, error) {
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept-Encoding", "gzip")
+	// MicroG does NOT set Accept-Encoding or Connection headers
 	req.Header.Set("User-Agent", cfg.AuthUserAgent())
 	req.Header.Set("app", form.Get("app"))
-	req.Header.Set("device", cfg.AndroidID)
-	req.Header.Set("Connection", "Keep-Alive")
+	// device header matches the androidId in the form body
+	deviceHeader := form.Get("androidId")
+	req.Header.Set("device", deviceHeader)
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)

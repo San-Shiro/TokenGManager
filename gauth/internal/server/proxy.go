@@ -75,14 +75,14 @@ func googleProxyHandler(cfg *config.Config, state *ProxyState, port int) http.Ha
 	jsBridge := login.BuildJSBridge(cfg)
 
 	// Append closeView override that posts to our callback
-	bridgeScript := jsBridge + fmt.Sprintf(`
+	bridgeScript := jsBridge + `
 ;(function() {
 	// Override closeView to notify our server
 	if (window.mm) {
 		var _origClose = window.mm.closeView;
 		window.mm.closeView = function() {
 			console.log('[gauth-proxy] closeView called, notifying server...');
-			fetch('http://localhost:%d/api/proxy-extract', {method:'POST'})
+			fetch('/api/proxy-extract', {method:'POST'})
 				.then(function(r) { return r.json(); })
 				.then(function(d) {
 					if (d.success) {
@@ -95,7 +95,7 @@ func googleProxyHandler(cfg *config.Config, state *ProxyState, port int) http.Ha
 	}
 	console.log('[gauth-proxy] Bridge + closeView override ready');
 })();
-`, port)
+`
 
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: false},
@@ -151,8 +151,9 @@ func googleProxyHandler(cfg *config.Config, state *ProxyState, port int) http.Ha
 		proxyReq.Host = "accounts.google.com"
 
 		// Rewrite Origin/Referer to point to Google
+		requestBase := requestBaseURL(r)
 		if ref := proxyReq.Header.Get("Referer"); ref != "" {
-			ref = strings.Replace(ref, fmt.Sprintf("http://localhost:%d/glogin", port), "https://accounts.google.com", 1)
+			ref = strings.Replace(ref, requestBase+"/glogin", "https://accounts.google.com", 1)
 			proxyReq.Header.Set("Referer", ref)
 		}
 		if origin := proxyReq.Header.Get("Origin"); origin != "" {
@@ -210,7 +211,7 @@ func googleProxyHandler(cfg *config.Config, state *ProxyState, port int) http.Ha
 			// Rewrite Location headers for redirects
 			if lower == "location" {
 				for _, v := range vals {
-					v = rewriteGoogleURL(v, port)
+					v = rewriteGoogleURL(v, requestBase)
 					w.Header().Add(key, v)
 				}
 				continue
@@ -248,7 +249,7 @@ func googleProxyHandler(cfg *config.Config, state *ProxyState, port int) http.Ha
 			content := string(bodyBytes)
 
 			// Rewrite Google URLs to go through proxy
-			content = rewriteBodyURLs(content, port)
+			content = rewriteBodyURLs(content, requestBase)
 
 			// Inject JS bridge into HTML pages
 			if isHTML {
@@ -399,21 +400,33 @@ func exchangeToken(cfg *config.Config, state *ProxyState, oauthToken string) {
 	state.SetResult(resp.Email, "")
 }
 
-// --- URL rewriting helpers ---
+// requestBaseURL derives the base URL (e.g. "http://20.196.153.25:8888")
+// from the incoming request's Host header, so proxied URLs work remotely.
+func requestBaseURL(r *http.Request) string {
+	host := r.Host // includes port, e.g. "20.196.153.25:8888"
+	if host == "" {
+		host = r.Header.Get("X-Forwarded-Host")
+	}
+	if host == "" {
+		host = "localhost"
+	}
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	return scheme + "://" + host
+}
 
-func rewriteGoogleURL(u string, port int) string {
-	base := fmt.Sprintf("http://localhost:%d", port)
+func rewriteGoogleURL(u string, base string) string {
 	u = strings.Replace(u, "https://accounts.google.com", base+"/glogin", 1)
 	u = strings.Replace(u, "http://accounts.google.com", base+"/glogin", 1)
 	return u
 }
 
-func rewriteBodyURLs(content string, port int) string {
-	base := fmt.Sprintf("http://localhost:%d", port)
-
+func rewriteBodyURLs(content string, base string) string {
 	// accounts.google.com → /glogin
 	content = strings.ReplaceAll(content, "https://accounts.google.com", base+"/glogin")
-	content = strings.ReplaceAll(content, "https:\\/\\/accounts.google.com", base+"\\/glogin")
+	content = strings.ReplaceAll(content, "https:\\/\\/accounts.google.com", strings.ReplaceAll(base, "/", "\\/")+"\\/glogin")
 	content = strings.ReplaceAll(content, "//accounts.google.com", base+"/glogin")
 
 	// Common Google static domains → /gproxy/
@@ -428,9 +441,10 @@ func rewriteBodyURLs(content string, port int) string {
 		"myaccount.google.com",
 		"lh3.googleusercontent.com",
 	}
+	escapedBase := strings.ReplaceAll(base, "/", "\\/")
 	for _, d := range staticDomains {
 		content = strings.ReplaceAll(content, "https://"+d, base+"/gproxy/"+d)
-		content = strings.ReplaceAll(content, "https:\\/\\/"+d, base+"\\/gproxy\\/"+d)
+		content = strings.ReplaceAll(content, "https:\\/\\/"+d, escapedBase+"\\/gproxy\\/"+d)
 		content = strings.ReplaceAll(content, "//"+d, base+"/gproxy/"+d)
 	}
 

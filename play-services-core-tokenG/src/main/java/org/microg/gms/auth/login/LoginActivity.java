@@ -61,11 +61,17 @@ import org.microg.gms.checkin.CheckinManager;
 import org.microg.gms.checkin.LastCheckinInfo;
 import org.microg.gms.common.HttpFormClient;
 import org.microg.gms.common.Utils;
-// // import org.microg.gms.people.PeopleManager;
+import org.microg.gms.database.TokenAccount;
+import org.microg.gms.database.TokenDatabase;
 import org.microg.gms.profile.Build;
+import org.microg.gms.profile.MultiDeviceRegistry;
 import org.microg.gms.profile.ProfileManager;
+import org.microg.gms.sync.BackendSyncManager;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -92,6 +98,7 @@ public class LoginActivity extends AssistantActivity {
     public static final int STATUS_BAR_DISABLE_BACK = 0x00400000;
 
     private static final String TAG = "GmsAuthLoginBrowser";
+    private MultiDeviceRegistry.DevicePreset assignedPreset;
     private static final String EMBEDDED_SETUP_URL = "https://accounts.google.com/EmbeddedSetup";
     private static final String PROGRAMMATIC_AUTH_URL = "https://accounts.google.com/o/oauth2/programmatic_auth";
     private static final String GOOGLE_SUITE_URL = "https://accounts.google.com/signin/continue";
@@ -171,15 +178,12 @@ public class LoginActivity extends AssistantActivity {
         }
         if (getIntent().hasExtra(EXTRA_TOKEN)) {
             if (getIntent().hasExtra(EXTRA_EMAIL)) {
-                AccountManager accountManager = AccountManager.get(this);
-                Account account = new Account(Objects.requireNonNull(getIntent().getStringExtra(EXTRA_EMAIL)),
-                        accountType);
-                accountManager.addAccountExplicitly(account, getIntent().getStringExtra(EXTRA_TOKEN), null);
-                if (isAuthVisible(this) && SDK_INT >= 26) {
-                    accountManager.setAccountVisibility(account, PACKAGE_NAME_KEY_LEGACY_NOT_VISIBLE,
-                            VISIBILITY_USER_MANAGED_VISIBLE);
-                }
-                retrieveGmsToken(account);
+                String email = Objects.requireNonNull(getIntent().getStringExtra(EXTRA_EMAIL));
+                String token = getIntent().getStringExtra(EXTRA_TOKEN);
+                AuthResponse simulated = new AuthResponse();
+                simulated.email = email;
+                simulated.token = token;
+                retrieveGmsToken(simulated);
             } else {
                 retrieveRtToken(getIntent().getStringExtra(EXTRA_TOKEN));
             }
@@ -314,24 +318,31 @@ public class LoginActivity extends AssistantActivity {
         NetworkInfo networkInfo = cm.getActiveNetworkInfo();
         // noinspection deprecation
         if (networkInfo != null && networkInfo.isConnected()) {
-            if (LastCheckinInfo.read(this).getAndroidId() == 0) {
-                new Thread(() -> {
-                    Runnable next;
-                    next = checkin(false) ? this::loadLoginPage : () -> showError(R.string.auth_general_error_desc);
-                    LoginActivity.this.runOnUiThread(next);
-                }).start();
-            } else {
-                loadLoginPage();
+            if (assignedPreset == null) {
+                List<TokenAccount> existing = TokenDatabase.getInstance(this).getAllAccounts();
+                assignedPreset = MultiDeviceRegistry.INSTANCE.allocatePreset(existing);
+                Log.d(TAG, "Allocated device preset: " + assignedPreset.getDisplayName());
             }
+            new Thread(() -> {
+                Runnable next;
+                next = checkinFreshDevice() ? this::loadLoginPage : () -> showError(R.string.auth_general_error_desc);
+                LoginActivity.this.runOnUiThread(next);
+            }).start();
         } else {
             showError(R.string.auth_no_network_error_desc);
         }
     }
 
     private void showError(int errorRes) {
+        showError(getText(errorRes));
+    }
+
+    private void showError(CharSequence text) {
         setTitle(R.string.auth_sorry);
-        findViewById(R.id.progress_bar).setVisibility(View.INVISIBLE);
-        setMessage(errorRes);
+        View pb = findViewById(R.id.progress_bar);
+        if (pb != null) pb.setVisibility(View.INVISIBLE);
+        setMessage(text);
+        Log.e(TAG, "Auth Error: " + text);
     }
 
     private void setMessage(@StringRes int res) {
@@ -357,59 +368,50 @@ public class LoginActivity extends AssistantActivity {
     private void closeWeb(boolean programmaticAuth) {
         setMessage(R.string.auth_finalize);
         runOnUiThread(() -> webView.setVisibility(INVISIBLE));
-        String cookies = CookieManager.getInstance()
-                .getCookie(programmaticAuth ? PROGRAMMATIC_AUTH_URL : EMBEDDED_SETUP_URL);
-        String[] temp = cookies.split(";");
-        for (String ar1 : temp) {
-            if (ar1.trim().startsWith(COOKIE_OAUTH_TOKEN + "=")) {
-                String[] temp1 = ar1.split("=");
-                retrieveRtToken(temp1[1]);
-                return;
+        String targetUrl = programmaticAuth ? PROGRAMMATIC_AUTH_URL : EMBEDDED_SETUP_URL;
+        String cookies = CookieManager.getInstance().getCookie(targetUrl);
+        Log.d(TAG, "closeWeb: cookies for " + targetUrl + ": " + (cookies != null ? "(present)" : "null"));
+        if (cookies != null) {
+            String[] temp = cookies.split(";");
+            for (String ar1 : temp) {
+                if (ar1.trim().startsWith(COOKIE_OAUTH_TOKEN + "=")) {
+                    String[] temp1 = ar1.split("=");
+                    if (temp1.length > 1) {
+                        retrieveRtToken(temp1[1]);
+                        return;
+                    }
+                }
             }
         }
-        showError(R.string.auth_general_error_desc);
+        showError("OAuth token cookie not found from Google login page. Please try again.");
     }
 
     private void retrieveRtToken(String oAuthToken) {
-        new AuthRequest().fromContext(this)
+        Log.i(TAG, "[TokenExchange] Cookie oauth_token: " + (oAuthToken != null ? (oAuthToken.length() > 15 ? oAuthToken.substring(0, 15) + "... (len=" + oAuthToken.length() + ")" : oAuthToken) : "null"));
+        new AuthRequest().fromContext(this, assignedPreset)
                 .appIsGms()
                 .callerIsGms()
                 .service("ac2dm")
                 .token(oAuthToken).isAccessToken()
                 .addAccount()
                 .getAccountId()
+                .droidguardResults("null")
                 .getResponseAsync(new HttpFormClient.Callback<AuthResponse>() {
                     @Override
                     public void onResponse(AuthResponse response) {
-                        Account account = new Account(response.email, accountType);
-                        if (accountManager.addAccountExplicitly(account, response.token, null)) {
-                            accountManager.setAuthToken(account, "SID", response.Sid);
-                            accountManager.setAuthToken(account, "LSID", response.LSid);
-                            accountManager.setUserData(account, "flags", "1");
-                            accountManager.setUserData(account, "services", response.services);
-                            accountManager.setUserData(account, "oauthAccessToken", "1");
-                            accountManager.setUserData(account, "firstName", response.firstName);
-                            accountManager.setUserData(account, "lastName", response.lastName);
-                            if (!TextUtils.isEmpty(response.accountId))
-                                accountManager.setUserData(account, "GoogleUserId", response.accountId);
-
-                            retrieveGmsToken(account);
-                            setResult(RESULT_OK);
-                        } else {
-                            Log.w(TAG, "Account NOT created!");
-                            runOnUiThread(() -> {
-                                showError(R.string.auth_general_error_desc);
-                                setNextButtonText(android.R.string.ok);
-                            });
-                            state = -2;
-                        }
+                        Log.i(TAG, "[TokenExchange] retrieveRtToken response for " + response.email +
+                                " -> Token: " + (response.token != null ? (response.token.length() > 15 ? response.token.substring(0, 15) + "... (len=" + response.token.length() + ")" : response.token) : "null") +
+                                ", Auth: " + (response.auth != null ? (response.auth.length() > 15 ? response.auth.substring(0, 15) + "... (len=" + response.auth.length() + ")" : response.auth) : "null"));
+                        retrieveGmsToken(response);
+                        setResult(RESULT_OK);
                     }
 
                     @Override
                     public void onException(Exception exception) {
-                        Log.w(TAG, "onException", exception);
+                        Log.w(TAG, "onException during retrieveRtToken", exception);
+                        final String msg = exception != null && exception.getMessage() != null ? exception.getMessage() : "Unknown error";
                         runOnUiThread(() -> {
-                            showError(R.string.auth_general_error_desc);
+                            showError("Sign-in Token Exchange Failed:\n" + msg);
                             setNextButtonText(android.R.string.ok);
                         });
                         state = -2;
@@ -417,51 +419,90 @@ public class LoginActivity extends AssistantActivity {
                 });
     }
 
-    private void returnSuccessResponse(Account account) {
+    private void returnSuccessResponse(String email) {
         if (response != null) {
             Bundle bd = new Bundle();
-            bd.putString(AccountManager.KEY_ACCOUNT_NAME, account.name);
+            bd.putString(AccountManager.KEY_ACCOUNT_NAME, email);
             bd.putBoolean("new_account_created", false);
             bd.putString(AccountManager.KEY_ACCOUNT_TYPE, accountType);
             response.onResult(bd);
         }
     }
 
-    private void retrieveGmsToken(final Account account) {
-        final AuthManager authManager = new AuthManager(this, account.name, GOOGLE_GMS_PACKAGE_NAME, "ac2dm");
-        authManager.setPermitted(true);
-        new AuthRequest().fromContext(this)
+    private void retrieveGmsToken(final AuthResponse rtResponse) {
+        new AuthRequest().fromContext(this, assignedPreset)
                 .appIsGms()
                 .callerIsGms()
-                .service(authManager.getService())
-                .email(account.name)
-                .token(AccountManager.get(this).getPassword(account))
+                .service("ac2dm")
+                .email(rtResponse.email)
+                .token(rtResponse.token)
                 .systemPartition(true)
                 .hasPermission(true)
                 .addAccount()
                 .getAccountId()
+                .droidguardResults("null")
                 .getResponseAsync(new HttpFormClient.Callback<AuthResponse>() {
                     @Override
-                    public void onResponse(AuthResponse response) {
-                        authManager.storeResponse(response);
-                        // TokenG: PeopleManager removed, skip loading user info
-                        // String accountId = PeopleManager.loadUserInfo(LoginActivity.this, account);
-                        // if (!TextUtils.isEmpty(accountId))
-                        // accountManager.setUserData(account, "GoogleUserId", accountId);
-                        if (isAuthVisible(LoginActivity.this) && SDK_INT >= 26) {
-                            accountManager.setAccountVisibility(account, PACKAGE_NAME_KEY_LEGACY_NOT_VISIBLE,
-                                    VISIBILITY_USER_MANAGED_VISIBLE);
+                    public void onResponse(AuthResponse gmsResponse) {
+                        Log.i(TAG, "[TokenExchange] retrieveGmsToken response -> Token: " +
+                                (gmsResponse != null && gmsResponse.token != null ? (gmsResponse.token.length() > 15 ? gmsResponse.token.substring(0, 15) + "..." : gmsResponse.token) : "null") +
+                                ", Auth: " + (gmsResponse != null && gmsResponse.auth != null ? (gmsResponse.auth.length() > 15 ? gmsResponse.auth.substring(0, 15) + "..." : gmsResponse.auth) : "null"));
+                        try {
+                            long gsfLong = LastCheckinInfo.read(LoginActivity.this).getAndroidId();
+                            String gsfHex = Long.toHexString(gsfLong);
+                            long secTokenLong = LastCheckinInfo.read(LoginActivity.this).getSecurityToken();
+                            String secTokenStr = String.valueOf(secTokenLong);
+
+                            if (assignedPreset == null) {
+                                List<TokenAccount> existing = TokenDatabase.getInstance(LoginActivity.this).getAllAccounts();
+                                assignedPreset = MultiDeviceRegistry.INSTANCE.allocatePreset(existing);
+                            }
+
+                            String activeAasToken = (gmsResponse != null && gmsResponse.auth != null) ? gmsResponse.auth : rtResponse.token;
+                            String googleUserId = !TextUtils.isEmpty(rtResponse.accountId) ? rtResponse.accountId : (gmsResponse != null ? gmsResponse.accountId : null);
+
+                            TokenAccount tokenAccount = new TokenAccount(
+                                    rtResponse.email,
+                                    rtResponse.token,
+                                    activeAasToken,
+                                    rtResponse.Sid,
+                                    rtResponse.LSid,
+                                    gsfHex,
+                                    secTokenStr,
+                                    assignedPreset.getDisplayName(),
+                                    assignedPreset.getModel(),
+                                    assignedPreset.getBrand(),
+                                    assignedPreset.getFingerprint(),
+                                    assignedPreset.getSdkVersion(),
+                                    rtResponse.firstName,
+                                    rtResponse.lastName,
+                                    googleUserId,
+                                    "PENDING",
+                                    System.currentTimeMillis(),
+                                    0L
+                            );
+
+                            TokenDatabase.getInstance(LoginActivity.this).insertOrUpdate(tokenAccount);
+                            Log.d(TAG, "Saved account to native TokenDatabase: " + tokenAccount.getEmail());
+
+                            if (BackendSyncManager.INSTANCE.isAutoSyncEnabled(LoginActivity.this)) {
+                                BackendSyncManager.INSTANCE.syncAccount(LoginActivity.this, tokenAccount, null);
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "Failed to save/sync native token account", e);
                         }
+
                         checkin(true);
-                        returnSuccessResponse(account);
+                        returnSuccessResponse(rtResponse.email);
                         finishAndRemoveTask();
                     }
 
                     @Override
                     public void onException(Exception exception) {
-                        Log.w(TAG, "onException", exception);
+                        Log.w(TAG, "onException during retrieveGmsToken", exception);
+                        final String msg = exception != null && exception.getMessage() != null ? exception.getMessage() : "Unknown error";
                         runOnUiThread(() -> {
-                            showError(R.string.auth_general_error_desc);
+                            showError("AAS Token Exchange Failed:\n" + msg);
                             setNextButtonText(android.R.string.ok);
                         });
                         state = -2;
@@ -471,12 +512,24 @@ public class LoginActivity extends AssistantActivity {
 
     private boolean checkin(boolean force) {
         try {
-            CheckinManager.checkin(LoginActivity.this, force);
+            CheckinManager.checkin(LoginActivity.this, force, assignedPreset);
             return true;
         } catch (IOException e) {
             Log.w(TAG, "Checkin failed", e);
         }
         return false;
+    }
+
+    private boolean checkinFreshDevice() {
+        try {
+            Log.d(TAG, "Executing fresh check-in for preset: " + (assignedPreset != null ? assignedPreset.getDisplayName() : "default"));
+            CheckinManager.checkinFresh(LoginActivity.this, assignedPreset);
+            Log.d(TAG, "Fresh check-in succeeded! New GSF ID: " + Long.toHexString(LastCheckinInfo.read(LoginActivity.this).getAndroidId()));
+            return true;
+        } catch (Exception e) {
+            Log.w(TAG, "Fresh checkin failed, attempting fallback checkin", e);
+            return checkin(true);
+        }
     }
 
     @SuppressLint("GestureBackNavigation")
@@ -540,14 +593,13 @@ public class LoginActivity extends AssistantActivity {
             return null;
         }
 
-        @SuppressWarnings("MissingPermission")
         @JavascriptInterface
         public final String getAccounts() {
             Log.d(TAG, "JSBridge: getAccounts");
-            Account[] accountsByType = accountManager.getAccountsByType(accountType);
+            List<TokenAccount> accounts = TokenDatabase.getInstance(LoginActivity.this).getAllAccounts();
             JSONArray json = new JSONArray();
-            for (Account account : accountsByType) {
-                json.put(account.name);
+            for (TokenAccount account : accounts) {
+                json.put(account.getEmail());
             }
             return json.toString();
         }
@@ -585,6 +637,16 @@ public class LoginActivity extends AssistantActivity {
         @JavascriptInterface
         public final int getDeviceDataVersionInfo() {
             return 1;
+        }
+
+        @JavascriptInterface
+        public final void getDroidGuardResult(String s) {
+            Log.d(TAG, "JSBridge: getDroidGuardResult: " + s);
+            try {
+                runScript("if (typeof window.setDgResult === 'function') { window.setDgResult(''); }");
+            } catch (Exception e) {
+                Log.w(TAG, "getDroidGuardResult error", e);
+            }
         }
 
         @JavascriptInterface

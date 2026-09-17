@@ -360,7 +360,7 @@
             android:targetActivity="org.microg.gms.ui.MainSettingsActivity">
         </activity-alias>
 
-        <!-- TokenG: AskPushPermissionActivity removed (GCM not available)
+    <!-- TokenG: AskPushPermissionActivity removed (GCM not available)
         <activity
             android:name="org.microg.gms.ui.AskPushPermissionActivity"
             android:configChanges="orientation|screenSize|keyboard|keyboardHidden"
@@ -371,23 +371,11 @@
         -->
 
         <activity
-            android:name="org.microg.gms.ui.SelfCheckFragment$AsActivity"
-            android:label="@string/self_check_title"
-            android:process=":ui"
-            android:taskAffinity="org.microg.gms.settings" />
-
-        <activity
             android:name="org.microg.gms.ui.AccountManagerActivity"
             android:label="@string/pref_account_title"
             android:process=":ui"
             android:taskAffinity="org.microg.gms.settings"
             android:theme="@style/AppTheme.Login" />
-
-        <activity
-            android:name="org.microg.gms.ui.PrivacySettingsActivity"
-            android:label="@string/pref_privacy_title"
-            android:process=":ui"
-            android:taskAffinity="org.microg.gms.settings" />
 
         <activity
             android:name="org.microg.gms.accountsettings.ui.MainActivity"
@@ -442,8 +430,25 @@
                 <action android:name="com.google.android.gms.auth.api.credentials.service.START" />
                 <action android:name="com.google.android.gms.common.service.START" />
                 <action android:name="com.google.android.gms.identity.service.BIND" />
+                <action android:name="com.google.android.gms.droidguard.service.INIT" />
+                <action android:name="com.google.android.gms.droidguard.service.PING" />
+                <action android:name="com.google.android.gms.droidguard.service.START" />
             </intent-filter>
         </service>
+
+        <service
+            android:name="org.microg.gms.sync.TokenValidationJobService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <receiver
+            android:name="org.microg.gms.sync.ValidationBootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <meta-data
             android:name="org.microg.gms.settings.checkin_enable_service"

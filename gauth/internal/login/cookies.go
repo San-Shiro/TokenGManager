@@ -1,3 +1,5 @@
+//go:build windows
+
 // Package login implements a cookie manager for WebView2 using the
 // Chrome DevTools Protocol (CDP) via the ICoreWebView2 COM vtable.
 // This reads HttpOnly cookies that JavaScript's document.cookie cannot access.

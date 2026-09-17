@@ -56,14 +56,57 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:ellipsize="marquee"
-                android:maxLines="10"
+                android:maxLines="1"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?attr/colorSecondary"
-                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintBottom_toTopOf="@id/account_device_badge"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="@id/account_name"
                 app:layout_constraintTop_toBottomOf="@id/account_name"
                 tools:text="email@example.com" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/account_device_badge"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="marquee"
+                android:singleLine="true"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorPrimary"
+                app:layout_constraintBottom_toTopOf="@id/account_token_info"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="@id/account_name"
+                app:layout_constraintTop_toBottomOf="@id/account_email"
+                tools:text="📱 Google Pixel 8 Pro • GSF: 3bed6528920a01ef" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/account_token_info"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:ellipsize="middle"
+                android:singleLine="true"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorSecondary"
+                app:layout_constraintBottom_toTopOf="@id/account_sync_badge"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="@id/account_name"
+                app:layout_constraintTop_toBottomOf="@id/account_device_badge"
+                tools:text="🔑 aas_et/AKppIN... [Tap to Copy]" />
+
+            <com.google.android.material.textview.MaterialTextView
+                android:id="@+id/account_sync_badge"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textAppearance="?attr/textAppearanceLabelSmall"
+                android:textColor="?attr/colorSecondary"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="@id/account_name"
+                app:layout_constraintTop_toBottomOf="@id/account_token_info"
+                tools:text="✓ Synced to DB" />
         </androidx.constraintlayout.widget.ConstraintLayout>
     </com.google.android.material.listitem.ListItemCardView>
 
@@ -71,6 +114,16 @@
         android:id="@+id/account_reveal_layout"
         android:layout_width="wrap_content"
         android:layout_height="match_parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/account_sync"
+            style="@style/Widget.Material3Expressive.Button.IconButton"
+            android:layout_width="76dp"
+            android:layout_height="match_parent"
+            app:backgroundTint="?attr/colorPrimary"
+            app:icon="@drawable/ic_sync"
+            app:iconGravity="textStart"
+            app:iconTint="?attr/colorOnPrimary" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/account_remove"

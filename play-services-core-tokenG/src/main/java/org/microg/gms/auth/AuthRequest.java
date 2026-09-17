@@ -68,8 +68,8 @@ public class AuthRequest extends HttpFormClient.Request {
     public boolean getAccountId;
     @RequestContent("ACCESS_TOKEN")
     public boolean isAccessToken;
-    // @RequestContent("droidguard_results")
-    // public String droidguardResults;
+    @RequestContent("droidguard_results")
+    public String droidguardResults;
     @RequestContent("has_permission")
     public boolean hasPermission;
     @RequestContent("add_account")
@@ -123,8 +123,17 @@ public class AuthRequest extends HttpFormClient.Request {
     }
 
     public AuthRequest fromContext(Context context) {
+        return fromContext(context, null);
+    }
+
+    public AuthRequest fromContext(Context context, org.microg.gms.profile.MultiDeviceRegistry.DevicePreset preset) {
         build(context);
         locale(Utils.getLocale(context));
+        if (preset != null) {
+            this.deviceName = preset.getDevice();
+            this.buildVersion = preset.getBuildId();
+            this.sdkVersion = preset.getSdkVersion();
+        }
         if (AuthPrefs.shouldIncludeAndroidId(context)) {
             androidIdHex = Long.toHexString(LastCheckinInfo.read(context).getAndroidId());
         }
@@ -204,10 +213,10 @@ public class AuthRequest extends HttpFormClient.Request {
         return this;
     }
 
-    // public AuthRequest droidguardResults(String droidguardResults) {
-    // this.droidguardResults = droidguardResults;
-    // return this;
-    // }
+    public AuthRequest droidguardResults(String droidguardResults) {
+        this.droidguardResults = droidguardResults;
+        return this;
+    }
 
     public AuthRequest delegation(int delegationType, String delegateeUserId) {
         this.delegationType = delegationType == 0 ? null : Integer.toString(delegationType);

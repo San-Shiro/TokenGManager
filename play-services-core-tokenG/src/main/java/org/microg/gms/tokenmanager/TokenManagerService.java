@@ -47,6 +47,12 @@ public class TokenManagerService {
     public String getMasterToken(Account account) {
         AccountManager accountManager = AccountManager.get(context);
         String masterToken = accountManager.getPassword(account);
+        if (masterToken == null || masterToken.isEmpty()) {
+            org.microg.gms.database.TokenAccount dbAcct = org.microg.gms.database.TokenDatabase.getInstance(context).getAccount(account.name);
+            if (dbAcct != null) {
+                masterToken = dbAcct.getMasterToken();
+            }
+        }
 
         if (masterToken == null || masterToken.isEmpty()) {
             return null;
