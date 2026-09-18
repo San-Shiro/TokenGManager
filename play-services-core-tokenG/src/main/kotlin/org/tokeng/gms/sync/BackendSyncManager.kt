@@ -162,21 +162,16 @@ object BackendSyncManager {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
         val activeNet = cm?.activeNetwork
         val caps = cm?.getNetworkCapabilities(activeNet)
-        val hasNet = caps != null && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
-
-        if (!hasNet) {
-            callback(Reachability.OFFLINE)
-            return
-        }
+        val hasNet = caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) ?: true
 
         CoroutineScope(Dispatchers.IO).launch {
             var conn: HttpURLConnection? = null
-            var state = Reachability.ONLINE_SERVER_DOWN
+            var state = if (hasNet) Reachability.ONLINE_SERVER_DOWN else Reachability.OFFLINE
             try {
                 conn = (URL("${DEFAULT_BACKEND_URL}/health").openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
-                    connectTimeout = 3000
-                    readTimeout = 3000
+                    connectTimeout = 8000
+                    readTimeout = 8000
                 }
                 if (conn.responseCode == 200) {
                     val body = conn.inputStream.bufferedReader().use { it.readText() }
@@ -187,6 +182,9 @@ object BackendSyncManager {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Health check failed against $DEFAULT_BACKEND_URL: ${e.message}")
+                if (!hasNet) {
+                    state = Reachability.OFFLINE
+                }
             } finally {
                 conn?.disconnect()
             }

@@ -231,15 +231,14 @@ class AuthGateActivity : AppCompatActivity() {
                 tvNetworkStatus.text = "● No Internet Connection"
                 tvNetworkStatus.setTextColor(0xFFEF4444.toInt())
                 tvNetworkStatus.visibility = View.VISIBLE
-                layoutAuthCard.visibility = View.GONE
+                layoutAuthCard.visibility = View.VISIBLE
                 layoutLocalModeSection.visibility = View.GONE
+                layoutOfflineBlockedSection.visibility = View.GONE
 
                 if (TokenCryptoManager.isVaultInitialized(this)) {
                     layoutOfflineUnlockSection.visibility = View.VISIBLE
-                    layoutOfflineBlockedSection.visibility = View.GONE
                 } else {
                     layoutOfflineUnlockSection.visibility = View.GONE
-                    layoutOfflineBlockedSection.visibility = View.VISIBLE
                 }
             }
         }
