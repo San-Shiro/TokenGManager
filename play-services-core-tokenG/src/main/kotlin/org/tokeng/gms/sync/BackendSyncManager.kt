@@ -155,7 +155,7 @@ object BackendSyncManager {
     }
 
     fun isUnlocked(context: Context): Boolean {
-        return (isLoggedIn(context) || isLocalMode(context)) && TokenCryptoManager.isUnlocked()
+        return isLoggedIn(context) || isLocalMode(context)
     }
 
     fun checkConnectivity(context: Context, callback: (Reachability) -> Unit) {
@@ -315,7 +315,13 @@ object BackendSyncManager {
         force: Boolean = false,
         callback: ((Boolean) -> Unit)? = null
     ) {
-        if (!isLoggedIn(context) || isLocalMode(context)) {
+        if (isLocalMode(context)) {
+            // Local mode does not sync with cloud; complete gracefully
+            callback?.invoke(true)
+            return
+        }
+
+        if (!isLoggedIn(context)) {
             callback?.invoke(false)
             return
         }
@@ -331,17 +337,23 @@ object BackendSyncManager {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 1. Pull delta first
-                pullDelta(context) { pullSuccess, _, _ ->
-                    // 2. Push any unsynced local accounts (excluding LOCAL_ONLY which must be manually synced from settings)
-                    val db = TokenDatabase.getInstance(context)
-                    val unsynced = db.getUnsyncedAccounts().filter { it.syncStatus != "LOCAL_ONLY" }
+                // 1. Push any unsynced local accounts first so new accounts are uploaded to cloud
+                val db = TokenDatabase.getInstance(context)
+                val unsynced = db.getUnsyncedAccounts().filter { it.syncStatus != "LOCAL_ONLY" }
+                val performPush = { onPushComplete: (Boolean) -> Unit ->
                     if (unsynced.isNotEmpty()) {
                         syncAccountsBatch(context, unsynced) { pushSuccess, _ ->
-                            callback?.invoke(pullSuccess && pushSuccess)
+                            onPushComplete(pushSuccess)
                         }
                     } else {
-                        callback?.invoke(pullSuccess)
+                        onPushComplete(true)
+                    }
+                }
+
+                performPush { pushSuccess ->
+                    // 2. Pull delta from cloud
+                    pullDelta(context) { pullSuccess, _, _ ->
+                        callback?.invoke(pushSuccess && pullSuccess)
                     }
                 }
             } catch (e: Exception) {
@@ -821,17 +833,6 @@ object BackendSyncManager {
                             db.insertOrUpdate(account)
                         }
                         appliedCount++
-                    }
-
-                    // Check existing local accounts: any local account not in the pulled server instances
-                    // is flagged as LOCAL_ONLY so it is distinct from cloud-synced accounts
-                    val allLocal = db.getAllAccounts()
-                    for (localAcc in allLocal) {
-                        if (!pulledEmails.contains(localAcc.email) && !pulledInstanceIds.contains(localAcc.instanceId)) {
-                            if (localAcc.syncStatus != "LOCAL_ONLY") {
-                                db.updateSyncStatus(localAcc.email, "LOCAL_ONLY", localAcc.lastSyncAt)
-                            }
-                        }
                     }
 
                     setLastError(context, null)

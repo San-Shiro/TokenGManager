@@ -109,6 +109,9 @@ class TokenDatabase private constructor(context: Context) :
     fun insertOrUpdate(account: TokenAccount): Boolean {
         return try {
             val db = writableDatabase
+            // Clean up any existing row with this email but different instanceId to guarantee uniqueness per email
+            db.delete(TABLE_ACCOUNTS, "$COL_EMAIL = ? AND $COL_INSTANCE_ID != ?", arrayOf(account.email, account.instanceId))
+
             val values = ContentValues().apply {
                 put(COL_INSTANCE_ID, account.instanceId)
                 put(COL_EMAIL, account.email)
@@ -582,6 +585,7 @@ class TokenDatabase private constructor(context: Context) :
             accountStatus = if (c.getColumnIndex(COL_ACCOUNT_STATUS) != -1) (c.getString(c.getColumnIndex(COL_ACCOUNT_STATUS)) ?: STATUS_ACTIVE) else STATUS_ACTIVE,
             lastValidatedAt = if (c.getColumnIndex(COL_LAST_VALIDATED_AT) != -1) c.getLong(c.getColumnIndex(COL_LAST_VALIDATED_AT)) else 0L,
             lastValidationResult = if (c.getColumnIndex(COL_LAST_VALIDATION_RESULT) != -1) c.getString(c.getColumnIndex(COL_LAST_VALIDATION_RESULT)) else null,
+            signedOutReason = if (c.getColumnIndex(COL_SIGNED_OUT_REASON) != -1) c.getString(c.getColumnIndex(COL_SIGNED_OUT_REASON)) else null,
             consecutiveAuthFailures = if (c.getColumnIndex(COL_AUTH_FAIL_COUNT) != -1) c.getInt(c.getColumnIndex(COL_AUTH_FAIL_COUNT)) else 0,
             instanceId = if (c.getColumnIndex(COL_INSTANCE_ID) != -1 && !c.isNull(c.getColumnIndex(COL_INSTANCE_ID))) {
                 c.getString(c.getColumnIndex(COL_INSTANCE_ID))
