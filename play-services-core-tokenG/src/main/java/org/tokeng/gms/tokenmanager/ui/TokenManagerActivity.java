@@ -81,8 +81,8 @@ public class TokenManagerActivity extends AppCompatActivity {
             return;
         }
 
-        // Periodic debounced auto-sync on app open
-        org.tokeng.gms.sync.BackendSyncManager.INSTANCE.triggerAutoSync(this, false, (success) -> {
+        // Auto-sync on app open / resume (force sync to catch newly added accounts immediately)
+        org.tokeng.gms.sync.BackendSyncManager.INSTANCE.triggerAutoSync(this, true, (success) -> {
             if (Boolean.TRUE.equals(success)) {
                 refreshCurrentDashboard();
             }

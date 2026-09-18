@@ -89,9 +89,16 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
 
     override fun onResume() {
         super.onResume()
-        refreshDashboard(force = false)
+        refreshDashboard(force = true)
         context?.let { ctx ->
             TokenValidationRunner.maybeValidateAll(ctx)
+            if (BackendSyncManager.isLoggedIn(ctx) && !BackendSyncManager.isLocalMode(ctx) && BackendSyncManager.isAutoSyncEnabled(ctx)) {
+                BackendSyncManager.triggerAutoSync(ctx, force = true) { success ->
+                    if (success) {
+                        refreshDashboard(force = true)
+                    }
+                }
+            }
         }
     }
 
@@ -101,7 +108,7 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
         val context = context ?: return
         val accounts = TokenDatabase.getInstance(context).getAllAccounts()
         val currentSignature = accounts.joinToString("|") {
-            "${it.email}:${it.androidId}:${it.masterToken}:${it.aasToken ?: ""}:${it.deviceName}:${it.deviceModel}:${it.deviceSdk}:${it.accountStatus}:${it.lastValidatedAt}"
+            "${it.email}:${it.androidId}:${it.masterToken}:${it.aasToken ?: ""}:${it.deviceName}:${it.deviceModel}:${it.deviceSdk}:${it.accountStatus}:${it.lastValidatedAt}:${it.syncStatus}"
         }
         if (!force && currentSignature == lastAccountsSignature && (preferenceScreen?.preferenceCount ?: 0) > 0) {
             return
@@ -211,7 +218,7 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
             val btnManage = itemView.findViewById<View>(R.id.btn_manage_account)
             val btnRelogin = itemView.findViewById<View>(R.id.btn_relogin)
             val statusBadge = itemView.findViewById<TextView>(R.id.account_status_badge)
-            val syncBadge = itemView.findViewById<TextView>(R.id.account_sync_badge)
+            val syncBadge = itemView.findViewById<View>(R.id.account_sync_badge)
             val btnHeaderSignIn = itemView.findViewById<View>(R.id.btn_header_signin)
             val signedOutBanner = itemView.findViewById<View>(R.id.signed_out_banner)
             val cardHeader = itemView.findViewById<View>(R.id.card_header)
@@ -224,10 +231,9 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
             textDeviceInfo?.text = "${account.deviceName} (${account.deviceModel}) • Android SDK ${account.deviceSdk}"
             textMasterToken?.text = "Master AAS: $obfuscatedToken"
 
-            // Mark unsynced accounts with a red badge; do NOT mark accounts that are synced
+            // Mark unsynced accounts with a red caution icon; do NOT mark accounts that are synced
             if (account.syncStatus != "SYNCED") {
                 syncBadge?.visibility = View.VISIBLE
-                syncBadge?.text = if (account.syncStatus == "LOCAL_ONLY") "LOCAL" else "UNSYNCED"
             } else {
                 syncBadge?.visibility = View.GONE
             }

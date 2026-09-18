@@ -518,8 +518,10 @@ public class LoginActivity extends AssistantActivity {
                             TokenDatabase.getInstance(LoginActivity.this).insertOrUpdate(tokenAccount);
                             Log.d(TAG, "Saved account to native TokenDatabase: " + tokenAccount.getEmail());
 
-                            if (BackendSyncManager.INSTANCE.isAutoSyncEnabled(LoginActivity.this)) {
-                                BackendSyncManager.INSTANCE.syncAccount(LoginActivity.this, tokenAccount, null);
+                            Context appContext = getApplicationContext();
+                            if (BackendSyncManager.INSTANCE.isAutoSyncEnabled(appContext)) {
+                                BackendSyncManager.INSTANCE.syncAccount(appContext, tokenAccount, null);
+                                BackendSyncManager.INSTANCE.triggerAutoSync(appContext, true, null);
                             }
                         } catch (Exception e) {
                             Log.w(TAG, "Failed to save/sync native token account", e);

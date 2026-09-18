@@ -6,7 +6,7 @@
         <item name="widgetLayout">@layout/preference_material_switch</item>
     </style>
 
-    <style name="Theme.Component.Material.AlertDialog" parent="@style/ThemeOverlay.Material3Expressive.MaterialAlertDialog.Centered">
+    <style name="Theme.Component.Material.AlertDialog" parent="@style/ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="android:colorBackground">?attr/colorSurfaceContainer</item>
         <item name="android:windowAnimationStyle">@style/MaterialAlertDialog.Material3.Animation</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
