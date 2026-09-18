@@ -115,6 +115,8 @@ class AuthGateActivity : AppCompatActivity() {
         btnRetryConnectivity = findViewById(R.id.btn_retry_connectivity)
 
         layoutLoadingScreen = findViewById(R.id.layout_loading_screen)
+
+        findViewById<TextView>(R.id.tv_app_version)?.text = "TokenG v${org.tokeng.gms.BuildConfig.VERSION_NAME} (Build ${org.tokeng.gms.BuildConfig.VERSION_CODE})"
     }
 
     private fun startEntranceAnimations() {

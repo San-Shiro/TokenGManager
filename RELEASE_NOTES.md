@@ -55,8 +55,8 @@ TokenG **v6.2.0** is a major feature and reliability milestone bringing a comple
 
 | Artifact | File Name | Size / Hash | Target Branch |
 |---|---|---|---|
-| **Android Release APK** | `tokeng-release-6.2.0.apk` (`app-release.apk`) | 11,816,816 bytes | `release-apk` |
-| **SHA-256 Checksum** | `0e27aedc6922b3003563eece4ff1ff56eba2bb4f2f8b55d118c647f4110daef4` | — | — |
+| **Android Release APK** | `tokeng-release-6.2.0.apk` (`app-release.apk`) | 11,817,604 bytes | `release-apk` |
+| **SHA-256 Checksum** | `345043509f0ffe8badfaec32d0dae821cfb48f3904ba73fe1743c3b59499ff9b` | — | — |
 | **Source Code** | Git Repository (`origin/deploy`, `origin/master`) | — | `deploy`, `master` |
 
 ### Download Links

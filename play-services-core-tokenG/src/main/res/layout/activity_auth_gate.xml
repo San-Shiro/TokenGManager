@@ -412,5 +412,18 @@
                 app:cornerRadius="23dp" />
         </LinearLayout>
 
+        <!-- Version Footer -->
+        <TextView
+            android:id="@+id/tv_app_version"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:layout_marginBottom="16dp"
+            android:gravity="center"
+            android:text="TokenG v6.2.0"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?android:attr/textColorSecondary"
+            android:alpha="0.7" />
+
     </LinearLayout>
 </ScrollView>

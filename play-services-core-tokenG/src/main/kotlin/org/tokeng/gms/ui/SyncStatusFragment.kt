@@ -192,7 +192,26 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         val themeSelectorPref = ThemeSelectorPreference(context)
         appearanceCategory.addPreference(themeSelectorPref)
 
-        // 4. SIGN OUT (Bottom Red Pill Button)
+        // 4. ABOUT
+        val aboutCategory = PreferenceCategory(context).apply {
+            title = "ABOUT"
+            layoutResource = R.layout.preference_material_category
+            isIconSpaceReserved = false
+        }
+        screen.addPreference(aboutCategory)
+
+        val versionPref = Preference(context).apply {
+            layoutResource = R.layout.preference_material_single
+            key = "pref_app_version"
+            title = "TokenG"
+            summary = "Version ${org.tokeng.gms.BuildConfig.VERSION_NAME} (Build ${org.tokeng.gms.BuildConfig.VERSION_CODE})"
+            icon = AppCompatResources.getDrawable(context, R.drawable.ic_launcher_foreground)
+            isIconSpaceReserved = true
+            isSelectable = false
+        }
+        aboutCategory.addPreference(versionPref)
+
+        // 5. SIGN OUT (Bottom Red Pill Button)
         if (BackendSyncManager.isLoggedIn(context)) {
             val signOutCategory = PreferenceCategory(context).apply {
                 layoutResource = R.layout.preference_material_category
