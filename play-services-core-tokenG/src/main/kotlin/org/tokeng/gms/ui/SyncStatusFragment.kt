@@ -180,7 +180,55 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
             }
         }
 
-        // 3. SIGN OUT (Bottom Red Pill Button)
+        // 3. APPEARANCE (Theme Switcher)
+        val appearanceCategory = PreferenceCategory(context).apply {
+            title = "APPEARANCE"
+            layoutResource = R.layout.preference_material_category
+            isIconSpaceReserved = false
+        }
+        screen.addPreference(appearanceCategory)
+
+        val currentMode = ThemeManager.getThemeMode(context)
+        val themeSummary = when (currentMode) {
+            ThemeManager.THEME_LIGHT -> "Light"
+            ThemeManager.THEME_DARK -> "Dark"
+            else -> "System default"
+        }
+
+        val themePref = Preference(context).apply {
+            layoutResource = R.layout.preference_material_single
+            key = "pref_app_theme"
+            title = "Theme"
+            summary = themeSummary
+            icon = AppCompatResources.getDrawable(context, R.drawable.ic_theme)
+            isIconSpaceReserved = true
+            setOnPreferenceClickListener {
+                val options = arrayOf("System default", "Light", "Dark")
+                val checkedItem = when (ThemeManager.getThemeMode(context)) {
+                    ThemeManager.THEME_LIGHT -> 1
+                    ThemeManager.THEME_DARK -> 2
+                    else -> 0
+                }
+                MaterialAlertDialogBuilder(context)
+                    .setTitle("Choose theme")
+                    .setSingleChoiceItems(options, checkedItem) { dialog, which ->
+                        val newMode = when (which) {
+                            1 -> ThemeManager.THEME_LIGHT
+                            2 -> ThemeManager.THEME_DARK
+                            else -> ThemeManager.THEME_SYSTEM
+                        }
+                        ThemeManager.setThemeMode(context, newMode)
+                        dialog.dismiss()
+                        activity?.recreate()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+                true
+            }
+        }
+        appearanceCategory.addPreference(themePref)
+
+        // 4. SIGN OUT (Bottom Red Pill Button)
         if (BackendSyncManager.isLoggedIn(context)) {
             val signOutCategory = PreferenceCategory(context).apply {
                 layoutResource = R.layout.preference_material_category

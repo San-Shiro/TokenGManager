@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ SPDX-FileCopyrightText: 2026 microG Project Team
+  ~ SPDX-License-Identifier: Apache-2.0
+  -->
+<resources>
+    <!--app icon background-->
+    <color name="ic_launcher_background">#1C222E</color>
+
+    <!--Material 3 Dark Mode Palette-->
+    <color name="md_theme_primary">#91B3FA</color>
+    <color name="md_theme_onPrimary">#002B66</color>
+    <color name="md_theme_primaryContainer">#264780</color>
+    <color name="md_theme_onPrimaryContainer">#D8E2FF</color>
+
+    <color name="md_theme_secondary">#BFC6DC</color>
+    <color name="md_theme_onSecondary">#293041</color>
+    <color name="md_theme_secondaryContainer">#3F4759</color>
+    <color name="md_theme_onSecondaryContainer">#DBE2F9</color>
+
+    <color name="md_theme_tertiary">#DFBCD8</color>
+    <color name="md_theme_onTertiary">#402842</color>
+    <color name="md_theme_tertiaryContainer">#583E5B</color>
+    <color name="md_theme_onTertiaryContainer">#FBD7FC</color>
+
+    <color name="md_theme_error">#FFB4AB</color>
+    <color name="md_theme_onError">#690005</color>
+    <color name="md_theme_errorContainer">#93000A</color>
+    <color name="md_theme_onErrorContainer">#FFDAD6</color>
+
+    <!--Dark background and surfaces-->
+    <color name="md_theme_background">#0E1117</color>
+    <color name="md_theme_onBackground">#F0F2F8</color>
+    <color name="md_theme_surface">#0E1117</color>
+    <color name="md_theme_onSurface">#F0F2F8</color>
+
+    <color name="md_theme_surfaceVariant">#252B38</color>
+    <color name="md_theme_onSurfaceVariant">#C4C8D4</color>
+    <color name="md_theme_outline">#4B5565</color>
+    <color name="md_theme_outlineVariant">#2D3545</color>
+    <color name="md_theme_scrim">#000000</color>
+
+    <color name="md_theme_inverseSurface">#E2E2E9</color>
+    <color name="md_theme_inverseOnSurface">#1A1B20</color>
+    <color name="md_theme_inversePrimary">#435E91</color>
+
+    <color name="md_theme_surfaceDim">#0E1117</color>
+    <color name="md_theme_surfaceBright">#383E4E</color>
+    <color name="md_theme_surfaceContainerLowest">#0A0D12</color>
+    <color name="md_theme_surfaceContainerLow">#151820</color>
+    <color name="md_theme_surfaceContainer">#1A1E26</color>
+    <color name="md_theme_surfaceContainerHigh">#222733</color>
+    <color name="md_theme_surfaceContainerHighest">#2C3241</color>
+</resources>

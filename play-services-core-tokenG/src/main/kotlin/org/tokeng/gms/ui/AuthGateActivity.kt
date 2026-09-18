@@ -65,6 +65,7 @@ class AuthGateActivity : AppCompatActivity() {
     private var isNavigating = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(R.layout.activity_auth_gate)

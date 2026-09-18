@@ -29,6 +29,7 @@ public class TokenManagerActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        org.tokeng.gms.ui.ThemeManager.INSTANCE.applyTheme(this);
         super.onCreate(savedInstanceState);
         getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
         setContentView(R.layout.activity_token_manager);

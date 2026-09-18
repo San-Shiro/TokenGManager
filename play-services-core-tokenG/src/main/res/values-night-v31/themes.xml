@@ -1,7 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
-
-    <!--app theme base-->
-
     <style name="AppTheme.Base" parent="@style/Theme.Material3Expressive.DynamicColors.DayNight.NoActionBar">
         <!--preference theme-->
         <item name="android:colorAccent">?attr/colorPrimary</item>
@@ -13,11 +11,11 @@
         <item name="switchBarPreferenceStyle">@style/Theme.Component.SwitchBarPreference</item>
         <!--fixes some UI issues on MIUI/HyperOS devices -->
         <item name="android:forceDarkAllowed" tools:targetApi="Q">false</item>
-        <!--app bars colors-->
+        <!--app bars colors in night mode: light icons-->
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
         <item name="android:enforceNavigationBarContrast">false</item>
         <!-- layout padding -->

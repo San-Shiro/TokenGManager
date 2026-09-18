@@ -69,6 +69,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
+        android:name="org.tokeng.gms.TokenGApplication"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         android:forceQueryable="true"
