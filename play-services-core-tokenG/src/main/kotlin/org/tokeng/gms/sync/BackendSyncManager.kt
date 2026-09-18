@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import org.tokeng.gms.crypto.TokenCryptoManager
 import org.tokeng.gms.database.TokenAccount
 import org.tokeng.gms.database.TokenDatabase
 import java.io.BufferedReader
@@ -118,6 +119,74 @@ object BackendSyncManager {
             .remove(KEY_USER_ID)
             .remove(KEY_LAST_SERVER_TIME)
             .apply()
+    }
+
+    private const val KEY_LOCAL_MODE = "is_local_mode_active"
+
+    enum class Reachability {
+        ONLINE_SERVER_UP,
+        ONLINE_SERVER_DOWN,
+        OFFLINE
+    }
+
+    fun isLocalMode(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getBoolean(KEY_LOCAL_MODE, false)
+    }
+
+    fun setLocalMode(context: Context, enabled: Boolean) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putBoolean(KEY_LOCAL_MODE, enabled).apply()
+    }
+
+    fun isUnlocked(context: Context): Boolean {
+        return (isLoggedIn(context) || isLocalMode(context)) && TokenCryptoManager.isUnlocked()
+    }
+
+    fun checkConnectivity(context: Context, callback: (Reachability) -> Unit) {
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        val activeNet = cm?.activeNetwork
+        val caps = cm?.getNetworkCapabilities(activeNet)
+        val hasNet = caps != null && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+
+        if (!hasNet) {
+            callback(Reachability.OFFLINE)
+            return
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            var conn: HttpURLConnection? = null
+            var state = Reachability.ONLINE_SERVER_DOWN
+            try {
+                conn = (URL("${DEFAULT_BACKEND_URL}/health").openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 3000
+                    readTimeout = 3000
+                }
+                if (conn.responseCode == 200) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val json = JSONObject(body)
+                    if (json.optString("status") == "ok" && json.optString("db") == "up") {
+                        state = Reachability.ONLINE_SERVER_UP
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Health check failed against $DEFAULT_BACKEND_URL: ${e.message}")
+            } finally {
+                conn?.disconnect()
+            }
+            withContext(Dispatchers.Main) {
+                callback(state)
+            }
+        }
+    }
+
+    fun signOut(context: Context) {
+        logout(context)
+        setLocalMode(context, false)
+        TokenDatabase.getInstance(context).deleteAllAccounts()
+        TokenCryptoManager.wipeVault(context)
+        Log.i(TAG, "Signed out. Local vault and session credentials completely wiped.")
     }
 
     fun isAutoSyncEnabled(context: Context): Boolean {

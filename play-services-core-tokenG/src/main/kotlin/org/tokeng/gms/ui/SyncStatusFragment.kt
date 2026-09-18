@@ -6,6 +6,7 @@
 package org.tokeng.gms.ui
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -92,6 +93,27 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         val screen = preferenceManager.createPreferenceScreen(context)
         preferenceScreen = screen
 
+        // 0. BANNERS (Local Mode & Server Inaccessible)
+        if (BackendSyncManager.isLocalMode(context)) {
+            val localModeBanner = Preference(context).apply {
+                layoutResource = R.layout.preference_material_information
+                isSelectable = false
+                title = "⚠ LOCAL MODE ACTIVE"
+                summary = "You are currently running in offline Local Mode. Connecting to a cloud account will replace your local accounts completely. Cloud merge will be added in a future update."
+            }
+            screen.addPreference(localModeBanner)
+        }
+
+        if (lastError != null && lastError.contains("refused", ignoreCase = true) || (lastError != null && lastError.contains("unreachable", ignoreCase = true))) {
+            val serverDownBanner = Preference(context).apply {
+                layoutResource = R.layout.preference_material_information
+                isSelectable = false
+                title = "⚠ Server Inaccessible"
+                summary = "Upstream server is temporarily inaccessible. Please update to the latest version or try again later."
+            }
+            screen.addPreference(serverDownBanner)
+        }
+
         // 1. CLOUD ACCOUNT & SESSION
         val accountCategory = PreferenceCategory(context).apply {
             title = "TOKEN-G CLOUD ACCOUNT"
@@ -120,22 +142,9 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
                 layoutResource = R.layout.preference_material_top
                 key = "pref_cloud_session"
                 title = "Signed In: $userEmail"
-                summary = "Tap to switch account or sign out"
+                summary = "Cloud Account Connected (tokeng.sanshiro.qzz.io)"
                 icon = AppCompatResources.getDrawable(context, R.drawable.ic_accounts)
                 isIconSpaceReserved = true
-                setOnPreferenceClickListener {
-                    MaterialAlertDialogBuilder(context)
-                        .setTitle("Sign Out")
-                        .setMessage("Do you want to sign out from $userEmail?")
-                        .setPositiveButton("Sign Out") { _, _ ->
-                            BackendSyncManager.logout(context)
-                            refreshSyncDashboard(force = true)
-                            view?.let { v -> Snackbar.make(v, "Signed out successfully", Snackbar.LENGTH_SHORT).show() }
-                        }
-                        .setNegativeButton(android.R.string.cancel, null)
-                        .show()
-                    true
-                }
             }
             accountCategory.addPreference(sessionPref)
 
@@ -176,15 +185,15 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         val syncAllPref = Preference(context).apply {
             layoutResource = R.layout.preference_material_top
             key = "pref_sync_all"
-            title = "Push All Accounts to Database"
-            summary = "Push all accounts, device identities & tokens to central server"
+            title = "Push All Accounts to Cloud"
+            summary = "Push accounts and tokens to your central cloud pool"
             icon = AppCompatResources.getDrawable(context, R.drawable.ic_sync)
             isIconSpaceReserved = true
             setOnPreferenceClickListener {
-                view?.let { v -> Snackbar.make(v, "Syncing all accounts to backend database...", Snackbar.LENGTH_SHORT).show() }
+                view?.let { v -> Snackbar.make(v, "Syncing all accounts to cloud...", Snackbar.LENGTH_SHORT).show() }
                 BackendSyncManager.syncAllAccounts(context) { successCount, failCount ->
                     val msg = if (failCount == 0) {
-                        "✓ Successfully synced $successCount account(s) to database!"
+                        "✓ Successfully synced $successCount account(s) to cloud!"
                     } else {
                         "Synced $successCount, failed $failCount account(s)"
                     }
@@ -196,39 +205,32 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         }
         controlsCategory.addPreference(syncAllPref)
 
-        // Backend Server URL (Middle Card)
-        val backendUrlPref = Preference(context).apply {
-            layoutResource = R.layout.preference_material_middle
-            key = "pref_backend_url"
-            title = "Backend Database URL"
-            summary = BackendSyncManager.getBackendUrl(context)
-            icon = AppCompatResources.getDrawable(context, R.drawable.ic_settings_link)
-            isIconSpaceReserved = true
-            setOnPreferenceClickListener {
-                showBackendUrlDialog()
-                true
-            }
-        }
-        controlsCategory.addPreference(backendUrlPref)
-
-        // Connection Diagnostics & Error Log (Bottom Card - Centralized Error Info)
-        val diagnosticsPref = Preference(context).apply {
+        // Sign Out & Wipe Local Vault (Bottom Card)
+        val signOutPref = Preference(context).apply {
             layoutResource = R.layout.preference_material_bottom
-            key = "pref_connection_diagnostics"
-            title = "Connection Status & Diagnostics"
-            summary = if (lastError != null) {
-                "⚠ Error: $lastError • Tap to view diagnostics log"
-            } else {
-                "✓ Connected: ${BackendSyncManager.getBackendUrl(context)}"
-            }
-            icon = AppCompatResources.getDrawable(context, R.drawable.ic_settings)
+            key = "pref_sign_out"
+            title = "Sign Out & Wipe Local Vault"
+            summary = "Clear all local accounts, tokens, and encryption keys from this device"
+            icon = AppCompatResources.getDrawable(context, android.R.drawable.ic_lock_power_off)
             isIconSpaceReserved = true
             setOnPreferenceClickListener {
-                showConnectionDiagnosticsDialog()
+                MaterialAlertDialogBuilder(context)
+                    .setTitle("Wipe Local Vault & Sign Out")
+                    .setMessage("Are you sure? This will delete all local accounts, tokens, and encryption keys from this device.")
+                    .setPositiveButton("Wipe & Sign Out") { _, _ ->
+                        BackendSyncManager.signOut(context)
+                        val intent = Intent(context, AuthGateActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        startActivity(intent)
+                        activity?.finish()
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
                 true
             }
         }
-        controlsCategory.addPreference(diagnosticsPref)
+        controlsCategory.addPreference(signOutPref)
 
         // 2. ACCOUNT SYNC STATUS
         val statusCategory = PreferenceCategory(context).apply {

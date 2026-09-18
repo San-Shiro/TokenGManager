@@ -29,6 +29,7 @@ public class TokenManagerActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
         setContentView(R.layout.activity_token_manager);
 
         Toolbar toolbar = findViewById(R.id.toolbar);
@@ -76,6 +77,17 @@ public class TokenManagerActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (!org.tokeng.gms.sync.BackendSyncManager.INSTANCE.isUnlocked(this)) {
+            Intent gateIntent = new Intent(this, org.tokeng.gms.ui.AuthGateActivity.class);
+            gateIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(gateIntent);
+            finish();
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         if (tabLayoutMediator != null) {
             tabLayoutMediator.detach();
@@ -86,6 +98,11 @@ public class TokenManagerActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
+        // Lock / Sign Out button in toolbar
+        MenuItem lockItem = menu.add(Menu.NONE, 9999, Menu.NONE, "Lock / Sign Out");
+        lockItem.setIcon(android.R.drawable.ic_lock_power_off);
+        lockItem.setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM);
+
         // Settings button in toolbar
         MenuItem settingsItem = menu.add(Menu.NONE, R.id.action_settings, Menu.NONE, "Settings");
         settingsItem.setIcon(android.R.drawable.ic_menu_preferences);
@@ -95,6 +112,21 @@ public class TokenManagerActivity extends AppCompatActivity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == 9999) {
+            new com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                .setTitle("Lock Vault & Sign Out")
+                .setMessage("Are you sure you want to sign out and lock this vault? Local tokens and credentials will be cleared from this device.")
+                .setPositiveButton("Sign Out & Lock", (dialog, which) -> {
+                    org.tokeng.gms.sync.BackendSyncManager.INSTANCE.signOut(this);
+                    Intent gateIntent = new Intent(this, org.tokeng.gms.ui.AuthGateActivity.class);
+                    gateIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(gateIntent);
+                    finish();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+            return true;
+        }
         if (item.getItemId() == R.id.action_settings) {
             // Navigate to microG Settings
             Intent intent = new Intent(this, MainSettingsActivity.class);
@@ -104,3 +136,4 @@ public class TokenManagerActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 }
+

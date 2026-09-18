@@ -291,11 +291,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Token Manager Activity -->
+        <!-- Auth Gate Activity (Mandatory App Lock Gateway) -->
         <activity
-            android:name="org.tokeng.gms.tokenmanager.ui.TokenManagerActivity"
+            android:name="org.tokeng.gms.ui.AuthGateActivity"
             android:exported="true"
-            android:label="Token Manager"
+            android:label="TokenG"
             android:taskAffinity="org.tokeng.gms.tokenmanager"
             android:theme="@style/AppTheme">
             <intent-filter>
@@ -303,6 +303,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Token Manager Activity (Unlocked Dashboard) -->
+        <activity
+            android:name="org.tokeng.gms.tokenmanager.ui.TokenManagerActivity"
+            android:exported="false"
+            android:label="TokenG"
+            android:taskAffinity="org.tokeng.gms.tokenmanager"
+            android:theme="@style/AppTheme" />
 
         <!-- Token Manager ContentProvider for external apps -->
         <provider

@@ -15,6 +15,11 @@ import android.util.Log
 class TokenDatabase private constructor(context: Context) :
     SQLiteOpenHelper(context.applicationContext, DB_NAME, null, DB_VERSION) {
 
+    override fun onConfigure(db: SQLiteDatabase) {
+        super.onConfigure(db)
+        db.enableWriteAheadLogging()
+    }
+
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """
@@ -284,6 +289,34 @@ class TokenDatabase private constructor(context: Context) :
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to delete all accounts", e)
+            false
+        }
+    }
+
+    @Synchronized
+    fun backupLocalAccounts(): Boolean {
+        return try {
+            val db = writableDatabase
+            db.execSQL("DROP TABLE IF EXISTS ${TABLE_ACCOUNTS}_backup")
+            db.execSQL("CREATE TABLE ${TABLE_ACCOUNTS}_backup AS SELECT * FROM $TABLE_ACCOUNTS")
+            Log.i(TAG, "Backed up local accounts table to ${TABLE_ACCOUNTS}_backup successfully.")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to backup local accounts", e)
+            false
+        }
+    }
+
+    @Synchronized
+    fun restoreLocalAccounts(): Boolean {
+        return try {
+            val db = writableDatabase
+            db.execSQL("DELETE FROM $TABLE_ACCOUNTS")
+            db.execSQL("INSERT OR REPLACE INTO $TABLE_ACCOUNTS SELECT * FROM ${TABLE_ACCOUNTS}_backup")
+            Log.i(TAG, "Restored local accounts from backup successfully.")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to restore local accounts from backup", e)
             false
         }
     }
