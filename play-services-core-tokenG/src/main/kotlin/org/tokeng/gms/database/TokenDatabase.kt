@@ -72,10 +72,11 @@ class TokenDatabase private constructor(context: Context) :
         if (oldVersion < 3) {
             addColumnIfMissing(db, TABLE_ACCOUNTS, COL_INSTANCE_ID, "TEXT")
             try {
+                db.execSQL("UPDATE $TABLE_ACCOUNTS SET $COL_INSTANCE_ID = $COL_EMAIL WHERE $COL_INSTANCE_ID IS NULL OR $COL_INSTANCE_ID = ''")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_instance ON $TABLE_ACCOUNTS($COL_INSTANCE_ID)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_email ON $TABLE_ACCOUNTS($COL_EMAIL)")
             } catch (e: Exception) {
-                Log.w(TAG, "Failed creating instance index", e)
+                Log.w(TAG, "Failed creating instance index or backfilling", e)
             }
         }
     }

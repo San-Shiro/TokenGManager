@@ -70,10 +70,7 @@
 
     <application
         android:name="org.tokeng.gms.TokenGApplication"
-        android:allowBackup="true"
-        android:enableOnBackInvokedCallback="true"
-        android:forceQueryable="true"
-        android:fullBackupOnly="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/gms_app_name"
         android:extractNativeLibs="false"
