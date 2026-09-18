@@ -278,11 +278,12 @@ object BackendSyncManager {
             return "Too many attempts. Please wait a few moments before trying again."
         }
 
-        // HTTP 500 / 502 / 503 / 504 / Database / Server Errors
+        // HTTP 500 / 502 / 503 / 504 / 530 / 1033 / Database / Server Errors
         if (lower.contains("500") || lower.contains("502") || lower.contains("503") || lower.contains("504") ||
+            lower.contains("530") || lower.contains("1033") || lower.contains("degraded") ||
             lower.contains("server error") || lower.contains("internal") || lower.contains("database") ||
             lower.contains("postgres") || lower.contains("pq:") || lower.contains("sql") || lower.contains("bad gateway")) {
-            return "Server is temporarily unavailable. Please try again in a few moments."
+            return "Server is temporarily offline (database unreachable). Please use Local Mode to access your tokens."
         }
 
         // Clean any backend JSON error payload: e.g. {"error":"..."}

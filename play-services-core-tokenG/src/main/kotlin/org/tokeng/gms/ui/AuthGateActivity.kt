@@ -158,7 +158,12 @@ class AuthGateActivity : AppCompatActivity() {
         }
 
         btnEnterLocalMode.setOnClickListener {
-            promptLocalModePassword()
+            val pwd = etPassword.text?.toString() ?: ""
+            if (pwd.length >= 4) {
+                enterLocalMode(pwd)
+            } else {
+                promptLocalModePassword()
+            }
         }
 
         btnUnlockOffline.setOnClickListener {
@@ -342,22 +347,32 @@ class AuthGateActivity : AppCompatActivity() {
                     showError("Local password must be at least 4 characters.")
                     return@setPositiveButton
                 }
-                val pwdChars = password.toCharArray()
-                val unlocked = if (TokenCryptoManager.isVaultInitialized(this)) {
-                    TokenCryptoManager.unlockVault(this, pwdChars)
-                } else {
-                    TokenCryptoManager.initializeVault(this, pwdChars)
-                }
-
-                if (unlocked) {
-                    BackendSyncManager.setLocalMode(this, true)
-                    navigateToDashboard()
-                } else {
-                    showError("Incorrect local unlocking password.")
-                }
+                enterLocalMode(password)
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    private fun enterLocalMode(password: String) {
+        val pwdChars = password.toCharArray()
+        val unlocked = if (TokenCryptoManager.isVaultInitialized(this)) {
+            if (TokenCryptoManager.unlockVault(this, pwdChars)) {
+                true
+            } else {
+                // If previous session vault had a different salt/password, re-initialize with new password
+                TokenCryptoManager.wipeVault(this)
+                TokenCryptoManager.initializeVault(this, pwdChars)
+            }
+        } else {
+            TokenCryptoManager.initializeVault(this, pwdChars)
+        }
+
+        if (unlocked) {
+            BackendSyncManager.setLocalMode(this, true)
+            navigateToDashboard()
+        } else {
+            showError("Unable to initialize local security vault. Please try again.")
+        }
     }
 
     private fun handleOfflineUnlock() {
@@ -393,7 +408,7 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun showError(msg: String) {
-        tvAuthError.text = BackendSyncManager.sanitizeErrorMessage(msg, isRegisterMode)
+        tvAuthError.text = msg
         tvAuthError.visibility = View.VISIBLE
     }
 }
