@@ -27,6 +27,7 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceViewHolder
 import org.tokeng.gms.R
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
@@ -180,7 +181,7 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
             }
         }
 
-        // 3. APPEARANCE (Theme Switcher)
+        // 3. APPEARANCE (Inline Theme Selector Panel)
         val appearanceCategory = PreferenceCategory(context).apply {
             title = "APPEARANCE"
             layoutResource = R.layout.preference_material_category
@@ -188,45 +189,8 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         }
         screen.addPreference(appearanceCategory)
 
-        val currentMode = ThemeManager.getThemeMode(context)
-        val themeSummary = when (currentMode) {
-            ThemeManager.THEME_LIGHT -> "Light"
-            ThemeManager.THEME_DARK -> "Dark"
-            else -> "System default"
-        }
-
-        val themePref = Preference(context).apply {
-            layoutResource = R.layout.preference_material_single
-            key = "pref_app_theme"
-            title = "Theme"
-            summary = themeSummary
-            icon = AppCompatResources.getDrawable(context, R.drawable.ic_theme)
-            isIconSpaceReserved = true
-            setOnPreferenceClickListener {
-                val options = arrayOf("System default", "Light", "Dark")
-                val checkedItem = when (ThemeManager.getThemeMode(context)) {
-                    ThemeManager.THEME_LIGHT -> 1
-                    ThemeManager.THEME_DARK -> 2
-                    else -> 0
-                }
-                MaterialAlertDialogBuilder(context)
-                    .setTitle("Choose theme")
-                    .setSingleChoiceItems(options, checkedItem) { dialog, which ->
-                        val newMode = when (which) {
-                            1 -> ThemeManager.THEME_LIGHT
-                            2 -> ThemeManager.THEME_DARK
-                            else -> ThemeManager.THEME_SYSTEM
-                        }
-                        ThemeManager.setThemeMode(context, newMode)
-                        dialog.dismiss()
-                        activity?.recreate()
-                    }
-                    .setNegativeButton("Cancel", null)
-                    .show()
-                true
-            }
-        }
-        appearanceCategory.addPreference(themePref)
+        val themeSelectorPref = ThemeSelectorPreference(context)
+        appearanceCategory.addPreference(themeSelectorPref)
 
         // 4. SIGN OUT (Bottom Red Pill Button)
         if (BackendSyncManager.isLoggedIn(context)) {
@@ -255,6 +219,58 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
                     .show()
             }
             signOutCategory.addPreference(redPillPref)
+        }
+    }
+
+    inner class ThemeSelectorPreference(
+        context: Context
+    ) : Preference(context) {
+        init {
+            layoutResource = R.layout.preference_theme_selector
+            key = "pref_theme_selector"
+            isSelectable = false
+        }
+
+        override fun onBindViewHolder(holder: PreferenceViewHolder) {
+            super.onBindViewHolder(holder)
+            val itemView = holder.itemView
+            val summaryView = itemView.findViewById<TextView>(R.id.theme_summary)
+            val toggleGroup = itemView.findViewById<MaterialButtonToggleGroup>(R.id.theme_toggle_group)
+
+            fun updateSummary(mode: String) {
+                summaryView?.text = when (mode) {
+                    ThemeManager.THEME_LIGHT -> "Light"
+                    ThemeManager.THEME_DARK -> "Dark"
+                    else -> "System default"
+                }
+            }
+
+            val currentMode = ThemeManager.getThemeMode(context)
+            updateSummary(currentMode)
+
+            val checkedId = when (currentMode) {
+                ThemeManager.THEME_LIGHT -> R.id.btn_theme_light
+                ThemeManager.THEME_DARK -> R.id.btn_theme_dark
+                else -> R.id.btn_theme_system
+            }
+
+            toggleGroup?.clearOnButtonCheckedListeners()
+            toggleGroup?.check(checkedId)
+
+            toggleGroup?.addOnButtonCheckedListener { _, id, isChecked ->
+                if (isChecked) {
+                    val targetMode = when (id) {
+                        R.id.btn_theme_light -> ThemeManager.THEME_LIGHT
+                        R.id.btn_theme_dark -> ThemeManager.THEME_DARK
+                        else -> ThemeManager.THEME_SYSTEM
+                    }
+                    if (targetMode != ThemeManager.getThemeMode(context)) {
+                        ThemeManager.setThemeMode(context, targetMode)
+                        updateSummary(targetMode)
+                        activity?.recreate()
+                    }
+                }
+            }
         }
     }
 

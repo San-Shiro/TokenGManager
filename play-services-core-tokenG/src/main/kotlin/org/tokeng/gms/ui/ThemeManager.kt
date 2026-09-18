@@ -23,6 +23,8 @@ object ThemeManager {
 
     fun setThemeMode(context: Context, mode: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val currentMode = prefs.getString(KEY_THEME_MODE, THEME_SYSTEM) ?: THEME_SYSTEM
+        if (currentMode == mode) return
         prefs.edit().putString(KEY_THEME_MODE, mode).apply()
         applyTheme(context)
     }
