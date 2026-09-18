@@ -7,30 +7,42 @@ package org.tokeng.gms.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.transition.AutoTransition
+import android.transition.TransitionManager
 import android.view.View
 import android.view.WindowManager
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import org.tokeng.gms.R
 import org.tokeng.gms.crypto.TokenCryptoManager
+import org.tokeng.gms.database.TokenDatabase
 import org.tokeng.gms.sync.BackendSyncManager
 import org.tokeng.gms.tokenmanager.ui.TokenManagerActivity
 
 class AuthGateActivity : AppCompatActivity() {
 
+    private lateinit var layoutHeader: View
     private lateinit var tvNetworkStatus: TextView
     private lateinit var layoutAuthCard: LinearLayout
     private lateinit var layoutTabs: LinearLayout
     private lateinit var tabSignIn: TextView
     private lateinit var tabRegister: TextView
-    private lateinit var etEmail: EditText
-    private lateinit var etPassword: EditText
-    private lateinit var etConfirmPassword: EditText
+    private lateinit var tilEmail: TextInputLayout
+    private lateinit var etEmail: TextInputEditText
+    private lateinit var tilPassword: TextInputLayout
+    private lateinit var etPassword: TextInputEditText
+    private lateinit var tilConfirmPassword: TextInputLayout
+    private lateinit var etConfirmPassword: TextInputEditText
     private lateinit var btnPrimaryAuth: Button
     private lateinit var progressAuth: ProgressBar
     private lateinit var tvAuthError: TextView
@@ -39,7 +51,8 @@ class AuthGateActivity : AppCompatActivity() {
     private lateinit var btnEnterLocalMode: Button
 
     private lateinit var layoutOfflineUnlockSection: LinearLayout
-    private lateinit var etOfflinePassword: EditText
+    private lateinit var tilOfflinePassword: TextInputLayout
+    private lateinit var etOfflinePassword: TextInputEditText
     private lateinit var btnUnlockOffline: Button
 
     private lateinit var layoutOfflineBlockedSection: LinearLayout
@@ -55,6 +68,7 @@ class AuthGateActivity : AppCompatActivity() {
 
         initViews()
         setupListeners()
+        startEntranceAnimations()
     }
 
     override fun onResume() {
@@ -68,13 +82,17 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
+        layoutHeader = findViewById(R.id.layout_header)
         tvNetworkStatus = findViewById(R.id.tv_network_status)
         layoutAuthCard = findViewById(R.id.layout_auth_card)
         layoutTabs = findViewById(R.id.layout_tabs)
         tabSignIn = findViewById(R.id.tab_sign_in)
         tabRegister = findViewById(R.id.tab_register)
+        tilEmail = findViewById(R.id.til_email)
         etEmail = findViewById(R.id.et_email)
+        tilPassword = findViewById(R.id.til_password)
         etPassword = findViewById(R.id.et_password)
+        tilConfirmPassword = findViewById(R.id.til_confirm_password)
         etConfirmPassword = findViewById(R.id.et_confirm_password)
         btnPrimaryAuth = findViewById(R.id.btn_primary_auth)
         progressAuth = findViewById(R.id.progress_auth)
@@ -84,6 +102,7 @@ class AuthGateActivity : AppCompatActivity() {
         btnEnterLocalMode = findViewById(R.id.btn_enter_local_mode)
 
         layoutOfflineUnlockSection = findViewById(R.id.layout_offline_unlock_section)
+        tilOfflinePassword = findViewById(R.id.til_offline_password)
         etOfflinePassword = findViewById(R.id.et_offline_password)
         btnUnlockOffline = findViewById(R.id.btn_unlock_offline)
 
@@ -91,30 +110,39 @@ class AuthGateActivity : AppCompatActivity() {
         btnRetryConnectivity = findViewById(R.id.btn_retry_connectivity)
     }
 
+    private fun startEntranceAnimations() {
+        layoutHeader.alpha = 0f
+        layoutHeader.translationY = -30f
+        layoutHeader.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(450)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+
+        layoutAuthCard.alpha = 0f
+        layoutAuthCard.translationY = 50f
+        layoutAuthCard.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(500)
+            .setStartDelay(100)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+    }
+
     private fun setupListeners() {
         tabSignIn.setOnClickListener {
             if (isRegisterMode) {
                 isRegisterMode = false
-                tabSignIn.setBackgroundColor(0xFF1E293B.toInt())
-                tabSignIn.setTextColor(0xFFFFFFFF.toInt())
-                tabRegister.setBackgroundColor(0x00000000)
-                tabRegister.setTextColor(0xFF64748B.toInt())
-                etConfirmPassword.visibility = View.GONE
-                btnPrimaryAuth.text = "Sign In to Cloud"
-                tvAuthError.visibility = View.GONE
+                animateTabSwitch(toRegister = false)
             }
         }
 
         tabRegister.setOnClickListener {
             if (!isRegisterMode) {
                 isRegisterMode = true
-                tabRegister.setBackgroundColor(0xFF1E293B.toInt())
-                tabRegister.setTextColor(0xFFFFFFFF.toInt())
-                tabSignIn.setBackgroundColor(0x00000000)
-                tabSignIn.setTextColor(0xFF64748B.toInt())
-                etConfirmPassword.visibility = View.VISIBLE
-                btnPrimaryAuth.text = "Create Cloud Account"
-                tvAuthError.visibility = View.GONE
+                animateTabSwitch(toRegister = true)
             }
         }
 
@@ -135,9 +163,39 @@ class AuthGateActivity : AppCompatActivity() {
         }
     }
 
+    private fun animateTabSwitch(toRegister: Boolean) {
+        TransitionManager.beginDelayedTransition(
+            layoutAuthCard,
+            AutoTransition().apply {
+                duration = 240
+                interpolator = AccelerateDecelerateInterpolator()
+            }
+        )
+
+        val onPrimaryColor = MaterialColors.getColor(this, R.attr.colorOnPrimary, 0xFFFFFFFF.toInt())
+        val secondaryTextColor = MaterialColors.getColor(this, android.R.attr.textColorSecondary, 0xFF64748B.toInt())
+
+        if (toRegister) {
+            tabRegister.setBackgroundResource(R.drawable.tab_pill_active)
+            tabRegister.setTextColor(onPrimaryColor)
+            tabSignIn.setBackgroundResource(R.drawable.tab_pill_inactive)
+            tabSignIn.setTextColor(secondaryTextColor)
+            tilConfirmPassword.visibility = View.VISIBLE
+            btnPrimaryAuth.text = "Create Cloud Account"
+        } else {
+            tabSignIn.setBackgroundResource(R.drawable.tab_pill_active)
+            tabSignIn.setTextColor(onPrimaryColor)
+            tabRegister.setBackgroundResource(R.drawable.tab_pill_inactive)
+            tabRegister.setTextColor(secondaryTextColor)
+            tilConfirmPassword.visibility = View.GONE
+            btnPrimaryAuth.text = "Sign In"
+        }
+        tvAuthError.visibility = View.GONE
+    }
+
     private fun checkConnectivity() {
-        tvNetworkStatus.text = "● Checking connectivity..."
-        tvNetworkStatus.setTextColor(0xFF38BDF8.toInt())
+        tvNetworkStatus.text = "● Connecting..."
+        tvNetworkStatus.setTextColor(MaterialColors.getColor(this, R.attr.colorPrimary, 0xFF38BDF8.toInt()))
 
         BackendSyncManager.checkConnectivity(this) { reachability ->
             currentReachability = reachability
@@ -156,7 +214,7 @@ class AuthGateActivity : AppCompatActivity() {
                 layoutOfflineBlockedSection.visibility = View.GONE
             }
             BackendSyncManager.Reachability.ONLINE_SERVER_DOWN -> {
-                tvNetworkStatus.text = "⚠ Upstream Server Inaccessible (Local Mode Available)"
+                tvNetworkStatus.text = "⚠ Upstream Server Inaccessible"
                 tvNetworkStatus.setTextColor(0xFFF59E0B.toInt())
                 layoutAuthCard.visibility = View.VISIBLE
                 layoutLocalModeSection.visibility = View.VISIBLE
@@ -164,7 +222,7 @@ class AuthGateActivity : AppCompatActivity() {
                 layoutOfflineBlockedSection.visibility = View.GONE
             }
             BackendSyncManager.Reachability.OFFLINE -> {
-                tvNetworkStatus.text = "✕ Offline (No Internet Connection)"
+                tvNetworkStatus.text = "✕ Offline (No Internet)"
                 tvNetworkStatus.setTextColor(0xFFEF4444.toInt())
                 layoutAuthCard.visibility = View.GONE
                 layoutLocalModeSection.visibility = View.GONE
@@ -181,8 +239,8 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun handlePrimaryAuth() {
-        val email = etEmail.text.toString().trim()
-        val password = etPassword.text.toString()
+        val email = etEmail.text?.toString()?.trim() ?: ""
+        val password = etPassword.text?.toString() ?: ""
 
         if (email.isEmpty() || !email.contains("@")) {
             showError("Please enter a valid Gmail address.")
@@ -194,7 +252,7 @@ class AuthGateActivity : AppCompatActivity() {
         }
 
         if (isRegisterMode) {
-            val confirmPassword = etConfirmPassword.text.toString()
+            val confirmPassword = etConfirmPassword.text?.toString() ?: ""
             if (password != confirmPassword) {
                 showError("Passwords do not match.")
                 return
@@ -202,7 +260,7 @@ class AuthGateActivity : AppCompatActivity() {
         }
 
         setLoading(true)
-        val callback = { success: Boolean, msg: String? ->
+        val callback: (Boolean, String?) -> Unit = { success, msg ->
             setLoading(false)
             if (success) {
                 // Initialize/unlock local crypto vault with master password
@@ -213,7 +271,25 @@ class AuthGateActivity : AppCompatActivity() {
                     TokenCryptoManager.unlockVault(this, pwdChars)
                 }
                 BackendSyncManager.setLocalMode(this, false)
-                navigateToDashboard()
+
+                // Prompt to sync local accounts to cloud if present
+                val localAccounts = TokenDatabase.getInstance(this).getAllAccounts()
+                if (localAccounts.isNotEmpty()) {
+                    MaterialAlertDialogBuilder(this)
+                        .setTitle("Sync Local Accounts?")
+                        .setMessage("Found ${localAccounts.size} account(s) saved on this device. Would you like to sync them to your cloud vault now?")
+                        .setPositiveButton("Sync Now") { _, _ ->
+                            BackendSyncManager.syncAllAccounts(this) { _, _ -> }
+                            navigateToDashboard()
+                        }
+                        .setNegativeButton("Skip") { _, _ ->
+                            navigateToDashboard()
+                        }
+                        .setCancelable(false)
+                        .show()
+                } else {
+                    navigateToDashboard()
+                }
             } else {
                 showError(msg ?: "Authentication failed. Check your credentials.")
             }
@@ -227,18 +303,23 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun promptLocalModePassword() {
-        val input = EditText(this).apply {
-            hint = "Unlocking Password"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-            setPadding(48, 32, 48, 32)
+        val til = TextInputLayout(this).apply {
+            hint = "Local Vault Password"
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, pad / 2)
+            endIconMode = TextInputLayout.END_ICON_PASSWORD_TOGGLE
         }
+        val input = TextInputEditText(this).apply {
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        til.addView(input)
 
         MaterialAlertDialogBuilder(this)
             .setTitle("Enter Local Mode")
-            .setMessage("The upstream server is down. You can manage tokens locally on this device.\n\n⚠️ Notice: Connecting to a cloud account later will replace your local vault.")
-            .setView(input)
+            .setMessage("Server is temporarily offline. Access and manage your tokens locally on this device.")
+            .setView(til)
             .setPositiveButton("Enter Local Mode") { _, _ ->
-                val password = input.text.toString()
+                val password = input.text?.toString() ?: ""
                 if (password.length < 4) {
                     showError("Local password must be at least 4 characters.")
                     return@setPositiveButton
@@ -262,7 +343,7 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun handleOfflineUnlock() {
-        val password = etOfflinePassword.text.toString()
+        val password = etOfflinePassword.text?.toString() ?: ""
         if (password.isEmpty()) {
             showError("Please enter your vault password.")
             return

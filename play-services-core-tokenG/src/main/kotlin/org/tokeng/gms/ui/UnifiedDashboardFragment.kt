@@ -123,7 +123,7 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
             layoutResource = R.layout.preference_material_single
             key = "pref_add_account"
             title = "+ Add Google Account"
-            summary = "Sign in to provision a fresh device identity & unique GSF ID"
+            summary = "Add a Google account to your vault"
             icon = AppCompatResources.getDrawable(context, R.drawable.ic_add)
             isIconSpaceReserved = true
             setOnPreferenceClickListener {
@@ -147,7 +147,7 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
                 layoutResource = R.layout.preference_material_information
                 isSelectable = false
                 title = "No Accounts Registered"
-                summary = "No Google accounts found in TokenG database.\n\nTap '+ Add Google Account' above to sign in. Every sign-in provisions a brand-new device registration, rotates device hardware fingerprints, and generates a unique GSF ID."
+                summary = "No Google accounts found in vault.\n\nTap '+ Add Google Account' above to get started."
             }
             accountsCategory.addPreference(emptyPref)
             return

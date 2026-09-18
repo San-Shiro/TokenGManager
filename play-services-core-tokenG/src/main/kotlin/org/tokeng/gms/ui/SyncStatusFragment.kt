@@ -98,8 +98,8 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
             val localModeBanner = Preference(context).apply {
                 layoutResource = R.layout.preference_material_information
                 isSelectable = false
-                title = "⚠ LOCAL MODE ACTIVE"
-                summary = "You are currently running in offline Local Mode. Connecting to a cloud account will replace your local accounts completely. Cloud merge will be added in a future update."
+                title = "Local Mode Active"
+                summary = "Vault is running locally. Connect to a cloud account to sync across devices."
             }
             screen.addPreference(localModeBanner)
         }
@@ -108,15 +108,15 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
             val serverDownBanner = Preference(context).apply {
                 layoutResource = R.layout.preference_material_information
                 isSelectable = false
-                title = "⚠ Server Inaccessible"
-                summary = "Upstream server is temporarily inaccessible. Please update to the latest version or try again later."
+                title = "Server Offline"
+                summary = "Upstream cloud is unreachable. Local changes remain cached on this device."
             }
             screen.addPreference(serverDownBanner)
         }
 
         // 1. CLOUD ACCOUNT & SESSION
         val accountCategory = PreferenceCategory(context).apply {
-            title = "TOKEN-G CLOUD ACCOUNT"
+            title = "TOKEN-G CLOUD"
             layoutResource = R.layout.preference_material_category
             isIconSpaceReserved = false
         }
@@ -124,10 +124,10 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
 
         if (!BackendSyncManager.isLoggedIn(context)) {
             val loginPref = Preference(context).apply {
-                layoutResource = R.layout.preference_material_top
+                layoutResource = R.layout.preference_material_single
                 key = "pref_cloud_login"
-                title = "Sign In / Register Cloud Account"
-                summary = "Connect to TokenG backend server to sync your credential pool"
+                title = "Connect Cloud Account"
+                summary = "Sign in to sync your token vault across devices"
                 icon = AppCompatResources.getDrawable(context, R.drawable.ic_accounts)
                 isIconSpaceReserved = true
                 setOnPreferenceClickListener {
@@ -142,7 +142,7 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
                 layoutResource = R.layout.preference_material_top
                 key = "pref_cloud_session"
                 title = "Signed In: $userEmail"
-                summary = "Cloud Account Connected (tokeng.sanshiro.qzz.io)"
+                summary = "tokeng.sanshiro.qzz.io"
                 icon = AppCompatResources.getDrawable(context, R.drawable.ic_accounts)
                 isIconSpaceReserved = true
             }
@@ -152,15 +152,15 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
             val pullDeltaPref = Preference(context).apply {
                 layoutResource = R.layout.preference_material_bottom
                 key = "pref_pull_delta"
-                title = "Pull Delta from Cloud"
-                summary = "Download new or updated token instances from your pool"
+                title = "Pull from Cloud"
+                summary = "Download new tokens and updates"
                 icon = AppCompatResources.getDrawable(context, R.drawable.ic_sync)
                 isIconSpaceReserved = true
                 setOnPreferenceClickListener {
                     view?.let { v -> Snackbar.make(v, "Pulling delta from cloud...", Snackbar.LENGTH_SHORT).show() }
                     BackendSyncManager.pullDelta(context) { success, count, err ->
                         val msg = if (success) {
-                            "✓ Pulled $count instance(s) from cloud!"
+                            "✓ Pulled $count instance(s) from cloud"
                         } else {
                             "Pull failed: ${err ?: "unknown"}"
                         }
@@ -175,25 +175,25 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
 
         // 2. CLOUD SYNC CONTROLS
         val controlsCategory = PreferenceCategory(context).apply {
-            title = "CLOUD SYNC CONTROLS"
+            title = "SYNC CONTROLS"
             layoutResource = R.layout.preference_material_category
             isIconSpaceReserved = false
         }
         screen.addPreference(controlsCategory)
 
-        // Sync All Accounts (Top Card)
+        // Sync All Accounts
         val syncAllPref = Preference(context).apply {
-            layoutResource = R.layout.preference_material_top
+            layoutResource = R.layout.preference_material_single
             key = "pref_sync_all"
             title = "Push All Accounts to Cloud"
-            summary = "Push accounts and tokens to your central cloud pool"
+            summary = "Upload local tokens to cloud vault"
             icon = AppCompatResources.getDrawable(context, R.drawable.ic_sync)
             isIconSpaceReserved = true
             setOnPreferenceClickListener {
                 view?.let { v -> Snackbar.make(v, "Syncing all accounts to cloud...", Snackbar.LENGTH_SHORT).show() }
                 BackendSyncManager.syncAllAccounts(context) { successCount, failCount ->
                     val msg = if (failCount == 0) {
-                        "✓ Successfully synced $successCount account(s) to cloud!"
+                        "✓ Successfully synced $successCount account(s)!"
                     } else {
                         "Synced $successCount, failed $failCount account(s)"
                     }
@@ -205,36 +205,9 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         }
         controlsCategory.addPreference(syncAllPref)
 
-        // Sign Out & Wipe Local Vault (Bottom Card)
-        val signOutPref = Preference(context).apply {
-            layoutResource = R.layout.preference_material_bottom
-            key = "pref_sign_out"
-            title = "Sign Out & Wipe Local Vault"
-            summary = "Clear all local accounts, tokens, and encryption keys from this device"
-            icon = AppCompatResources.getDrawable(context, android.R.drawable.ic_lock_power_off)
-            isIconSpaceReserved = true
-            setOnPreferenceClickListener {
-                MaterialAlertDialogBuilder(context)
-                    .setTitle("Wipe Local Vault & Sign Out")
-                    .setMessage("Are you sure? This will delete all local accounts, tokens, and encryption keys from this device.")
-                    .setPositiveButton("Wipe & Sign Out") { _, _ ->
-                        BackendSyncManager.signOut(context)
-                        val intent = Intent(context, AuthGateActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        startActivity(intent)
-                        activity?.finish()
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show()
-                true
-            }
-        }
-        controlsCategory.addPreference(signOutPref)
-
-        // 2. ACCOUNT SYNC STATUS
+        // 3. ACCOUNT SYNC STATUS
         val statusCategory = PreferenceCategory(context).apply {
-            title = "ACCOUNT SYNC STATUS"
+            title = "ACCOUNT SYNC STATUS (${accounts.size})"
             layoutResource = R.layout.preference_material_category
             isIconSpaceReserved = false
         }
@@ -242,32 +215,73 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
 
         if (accounts.isEmpty()) {
             val emptyPref = Preference(context).apply {
-                layoutResource = R.layout.preference_material_information
+                layoutResource = R.layout.preference_material_single
                 isSelectable = false
-                title = "No Accounts to Sync"
-                summary = "Sign in to a Google account in the Accounts tab first. Accounts registered will appear here with their central database sync status."
+                title = "No Accounts"
+                summary = "No Google accounts in vault. Tap '+ Add Account' on the main screen to register."
             }
             statusCategory.addPreference(emptyPref)
-            return
+        } else {
+            accounts.forEach { account ->
+                val activeToken = if (!account.aasToken.isNullOrEmpty()) account.aasToken!! else account.masterToken
+                val cardPref = SyncAccountCardPreference(
+                    context = context,
+                    account = account,
+                    obfuscatedToken = obfuscateToken(activeToken),
+                    circleAvatar = getCircleAvatar(account),
+                    onResyncAccount = {
+                        view?.let { v -> Snackbar.make(v, "Syncing ${account.email}...", Snackbar.LENGTH_SHORT).show() }
+                        BackendSyncManager.syncAccount(context, account) { success, err ->
+                            val msg = if (success) "✓ Synced ${account.email}!" else "⚠ Sync failed: ${err ?: "unknown"}"
+                            view?.let { v -> Snackbar.make(v, msg, Snackbar.LENGTH_LONG).show() }
+                            refreshSyncDashboard()
+                        }
+                    }
+                )
+                statusCategory.addPreference(cardPref)
+            }
         }
 
-        accounts.forEach { account ->
-            val activeToken = if (!account.aasToken.isNullOrEmpty()) account.aasToken!! else account.masterToken
-            val cardPref = SyncAccountCardPreference(
-                context = context,
-                account = account,
-                obfuscatedToken = obfuscateToken(activeToken),
-                circleAvatar = getCircleAvatar(account),
-                onResyncAccount = {
-                    view?.let { v -> Snackbar.make(v, "Syncing ${account.email}...", Snackbar.LENGTH_SHORT).show() }
-                    BackendSyncManager.syncAccount(context, account) { success, err ->
-                        val msg = if (success) "✓ Synced ${account.email} to database!" else "⚠ Sync failed: ${err ?: "unknown"}"
-                        view?.let { v -> Snackbar.make(v, msg, Snackbar.LENGTH_LONG).show() }
-                        refreshSyncDashboard()
+        // 4. SIGN OUT (Bottom Red Pill Button)
+        val signOutCategory = PreferenceCategory(context).apply {
+            layoutResource = R.layout.preference_material_category
+            isIconSpaceReserved = false
+        }
+        screen.addPreference(signOutCategory)
+
+        val redPillPref = SignOutPillPreference(context) {
+            MaterialAlertDialogBuilder(context)
+                .setTitle("Sign Out & Lock Vault")
+                .setMessage("Are you sure? This will clear all local tokens and encryption keys from this device.")
+                .setPositiveButton("Sign Out & Lock") { _, _ ->
+                    BackendSyncManager.signOut(context)
+                    val intent = Intent(context, AuthGateActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
                     }
+                    startActivity(intent)
+                    activity?.finish()
                 }
-            )
-            statusCategory.addPreference(cardPref)
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+        signOutCategory.addPreference(redPillPref)
+    }
+
+    inner class SignOutPillPreference(
+        context: Context,
+        private val onSignOut: () -> Unit
+    ) : Preference(context) {
+        init {
+            layoutResource = R.layout.preference_red_pill_sign_out
+            key = "pref_red_pill_sign_out"
+            isSelectable = false
+        }
+
+        override fun onBindViewHolder(holder: PreferenceViewHolder) {
+            super.onBindViewHolder(holder)
+            holder.itemView.findViewById<View>(R.id.btn_sign_out_pill)?.setOnClickListener {
+                onSignOut()
+            }
         }
     }
 
