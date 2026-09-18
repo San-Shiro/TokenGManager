@@ -30,7 +30,7 @@ public class TokenManagerActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
+        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE);
         setContentView(R.layout.activity_token_manager);
 
         Toolbar toolbar = findViewById(R.id.toolbar);

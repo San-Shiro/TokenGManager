@@ -62,10 +62,11 @@ class AuthGateActivity : AppCompatActivity() {
 
     private var isRegisterMode = false
     private var currentReachability = BackendSyncManager.Reachability.OFFLINE
+    private var isNavigating = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(R.layout.activity_auth_gate)
 
         initViews()
@@ -80,6 +81,7 @@ class AuthGateActivity : AppCompatActivity() {
             navigateToDashboard()
             return
         }
+        isNavigating = false
         checkConnectivity()
     }
 
@@ -247,8 +249,8 @@ class AuthGateActivity : AppCompatActivity() {
         val email = etEmail.text?.toString()?.trim() ?: ""
         val password = etPassword.text?.toString() ?: ""
 
-        if (email.isEmpty() || !email.contains("@")) {
-            showError("Please enter a valid Gmail address.")
+        if (email.isEmpty() || !email.lowercase().endsWith("@gmail.com") || email.substringBefore("@gmail.com").isBlank()) {
+            showError("Please enter a valid @gmail.com address.")
             return
         }
         if (password.length < 6) {
@@ -267,27 +269,44 @@ class AuthGateActivity : AppCompatActivity() {
         setLoading(true)
         val callback: (Boolean, String?) -> Unit = { success, msg ->
             if (success) {
-                // Fade out auth form and display sleek loading screen
-                layoutAuthCard.animate().alpha(0f).setDuration(200).withEndAction {
-                    layoutAuthCard.visibility = View.GONE
-                    layoutLoadingScreen.alpha = 0f
-                    layoutLoadingScreen.visibility = View.VISIBLE
-                    layoutLoadingScreen.animate().alpha(1f).setDuration(250).start()
-                }.start()
-
-                // Initialize/unlock local crypto vault with master password
+                // Initialize/unlock local crypto vault with user password
                 val pwdChars = password.toCharArray()
-                if (!TokenCryptoManager.isVaultInitialized(this)) {
+                val vaultOk = if (isRegisterMode) {
+                    TokenCryptoManager.wipeVault(this)
                     TokenCryptoManager.initializeVault(this, pwdChars)
                 } else {
-                    TokenCryptoManager.unlockVault(this, pwdChars)
+                    if (TokenCryptoManager.isVaultInitialized(this)) {
+                        if (!TokenCryptoManager.unlockVault(this, pwdChars)) {
+                            // Re-initialize local vault with validated credentials
+                            TokenCryptoManager.wipeVault(this)
+                            TokenCryptoManager.initializeVault(this, pwdChars)
+                        } else {
+                            true
+                        }
+                    } else {
+                        TokenCryptoManager.initializeVault(this, pwdChars)
+                    }
                 }
-                BackendSyncManager.setLocalMode(this, false)
 
-                // Smooth transition straight to home dashboard
-                layoutLoadingScreen.postDelayed({
-                    navigateToDashboard()
-                }, 500)
+                if (!vaultOk || !TokenCryptoManager.isUnlocked()) {
+                    setLoading(false)
+                    showError("Failed to initialize security vault. Please try again.")
+                } else {
+                    BackendSyncManager.setLocalMode(this, false)
+
+                    // Fade out auth form and display sleek loading screen
+                    layoutAuthCard.animate().alpha(0f).setDuration(200).withEndAction {
+                        layoutAuthCard.visibility = View.GONE
+                        layoutLoadingScreen.alpha = 0f
+                        layoutLoadingScreen.visibility = View.VISIBLE
+                        layoutLoadingScreen.animate().alpha(1f).setDuration(250).start()
+                    }.start()
+
+                    // Smooth transition straight to home dashboard
+                    layoutLoadingScreen.postDelayed({
+                        navigateToDashboard()
+                    }, 500)
+                }
             } else {
                 setLoading(false)
                 showError(BackendSyncManager.sanitizeErrorMessage(msg, isRegisterMode))
@@ -358,6 +377,8 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun navigateToDashboard() {
+        if (isNavigating) return
+        isNavigating = true
         val intent = Intent(this, TokenManagerActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
         }

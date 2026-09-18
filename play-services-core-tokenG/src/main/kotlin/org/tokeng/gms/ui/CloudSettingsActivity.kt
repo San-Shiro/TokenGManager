@@ -16,7 +16,7 @@ class CloudSettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         setContentView(R.layout.activity_cloud_settings)
 
         val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)

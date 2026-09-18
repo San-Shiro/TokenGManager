@@ -334,9 +334,9 @@ object BackendSyncManager {
             try {
                 // 1. Pull delta first
                 pullDelta(context) { pullSuccess, _, _ ->
-                    // 2. Push any unsynced local accounts
+                    // 2. Push any unsynced local accounts (excluding LOCAL_ONLY which must be manually synced from settings)
                     val db = TokenDatabase.getInstance(context)
-                    val unsynced = db.getUnsyncedAccounts()
+                    val unsynced = db.getUnsyncedAccounts().filter { it.syncStatus != "LOCAL_ONLY" }
                     if (unsynced.isNotEmpty()) {
                         syncAccountsBatch(context, unsynced) { pushSuccess, _ ->
                             callback?.invoke(pullSuccess && pushSuccess)
@@ -430,13 +430,14 @@ object BackendSyncManager {
                     val userId = json.optString("user_id")
 
                     val prevUser = getLastSyncedUser(context)
-                    if (prevUser != null && !prevUser.equals(email.trim(), ignoreCase = true)) {
+                    if (prevUser == null || !prevUser.equals(email.trim(), ignoreCase = true)) {
                         val db = TokenDatabase.getInstance(context)
                         db.deleteSyncedAccounts()
                         db.markRemainingAsLocalOnly()
                         setLastServerTime(context, "1970-01-01T00:00:00Z")
                     }
                     setLastSyncedUser(context, email.trim())
+                    lastAutoSyncTimestamp = 0L
 
                     setAuthToken(context, token)
                     setUserEmail(context, email.trim())
@@ -505,13 +506,14 @@ object BackendSyncManager {
                     val userId = json.optString("user_id")
 
                     val prevUser = getLastSyncedUser(context)
-                    if (prevUser != null && !prevUser.equals(email.trim(), ignoreCase = true)) {
+                    if (prevUser == null || !prevUser.equals(email.trim(), ignoreCase = true)) {
                         val db = TokenDatabase.getInstance(context)
                         db.deleteSyncedAccounts()
                         db.markRemainingAsLocalOnly()
                         setLastServerTime(context, "1970-01-01T00:00:00Z")
                     }
                     setLastSyncedUser(context, email.trim())
+                    lastAutoSyncTimestamp = 0L
 
                     setAuthToken(context, token)
                     setUserEmail(context, email.trim())

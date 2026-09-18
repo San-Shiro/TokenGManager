@@ -297,7 +297,8 @@
             android:exported="true"
             android:label="TokenG"
             android:taskAffinity="org.tokeng.gms.tokenmanager"
-            android:theme="@style/AppTheme">
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -310,7 +311,8 @@
             android:exported="false"
             android:label="TokenG"
             android:taskAffinity="org.tokeng.gms.tokenmanager"
-            android:theme="@style/AppTheme" />
+            android:theme="@style/AppTheme"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- Cloud Settings Activity (Settings & Sync Management) -->
         <activity
