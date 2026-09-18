@@ -35,7 +35,7 @@ object BackendSyncManager {
     private const val KEY_USER_ID = "backend_user_id"
     private const val KEY_LAST_SERVER_TIME = "last_server_time"
 
-    const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8088"
+    const val DEFAULT_BACKEND_URL = "https://tokeng.sanshiro.qzz.io"
 
     fun getLastError(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -48,8 +48,7 @@ object BackendSyncManager {
     }
 
     fun getBackendUrl(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_BACKEND_URL, DEFAULT_BACKEND_URL) ?: DEFAULT_BACKEND_URL
+        return DEFAULT_BACKEND_URL
     }
 
     fun setBackendUrl(context: Context, url: String) {
