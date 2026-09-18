@@ -319,9 +319,22 @@ public class LoginActivity extends AssistantActivity {
         // noinspection deprecation
         if (networkInfo != null && networkInfo.isConnected()) {
             if (assignedPreset == null) {
-                List<TokenAccount> existing = TokenDatabase.getInstance(this).getAllAccounts();
-                assignedPreset = MultiDeviceRegistry.INSTANCE.allocatePreset(existing);
-                Log.d(TAG, "Allocated device preset: " + assignedPreset.getDisplayName());
+                String reLoginEmail = getIntent().getStringExtra("email");
+                TokenAccount existingAcct = !TextUtils.isEmpty(reLoginEmail) ? TokenDatabase.getInstance(this).getAccount(reLoginEmail) : null;
+                if (existingAcct != null) {
+                    assignedPreset = MultiDeviceRegistry.createPreset(
+                            existingAcct.getDeviceName(),
+                            existingAcct.getDeviceModel(),
+                            existingAcct.getDeviceBrand(),
+                            existingAcct.getDeviceFingerprint(),
+                            existingAcct.getDeviceSdk()
+                    );
+                    Log.d(TAG, "Reusing existing device identity for " + reLoginEmail + ": " + assignedPreset.getDisplayName() + ", GSF: " + existingAcct.getAndroidId());
+                } else {
+                    List<TokenAccount> existing = TokenDatabase.getInstance(this).getAllAccounts();
+                    assignedPreset = MultiDeviceRegistry.INSTANCE.allocatePreset(existing);
+                    Log.d(TAG, "Allocated device preset: " + assignedPreset.getDisplayName());
+                }
             }
             new Thread(() -> {
                 Runnable next;
@@ -411,7 +424,7 @@ public class LoginActivity extends AssistantActivity {
                         Log.w(TAG, "onException during retrieveRtToken", exception);
                         final String msg = exception != null && exception.getMessage() != null ? exception.getMessage() : "Unknown error";
                         runOnUiThread(() -> {
-                            showError("Sign-in Token Exchange Failed:\n" + msg);
+                            showError("Unable to complete sign-in. Please check your network connection and try again.");
                             setNextButtonText(android.R.string.ok);
                         });
                         state = -2;
@@ -448,14 +461,34 @@ public class LoginActivity extends AssistantActivity {
                                 (gmsResponse != null && gmsResponse.token != null ? (gmsResponse.token.length() > 15 ? gmsResponse.token.substring(0, 15) + "..." : gmsResponse.token) : "null") +
                                 ", Auth: " + (gmsResponse != null && gmsResponse.auth != null ? (gmsResponse.auth.length() > 15 ? gmsResponse.auth.substring(0, 15) + "..." : gmsResponse.auth) : "null"));
                         try {
-                            long gsfLong = LastCheckinInfo.read(LoginActivity.this).getAndroidId();
-                            String gsfHex = Long.toHexString(gsfLong);
-                            long secTokenLong = LastCheckinInfo.read(LoginActivity.this).getSecurityToken();
-                            String secTokenStr = String.valueOf(secTokenLong);
+                            String reLoginEmail = getIntent().getStringExtra("email");
+                            TokenAccount existingAcct = !TextUtils.isEmpty(reLoginEmail) ? TokenDatabase.getInstance(LoginActivity.this).getAccount(reLoginEmail) : null;
+
+                            String gsfHex;
+                            String secTokenStr;
+                            if (existingAcct != null && !TextUtils.isEmpty(existingAcct.getAndroidId()) && !"0".equals(existingAcct.getAndroidId())) {
+                                gsfHex = existingAcct.getAndroidId();
+                                secTokenStr = existingAcct.getSecurityToken();
+                            } else {
+                                long gsfLong = LastCheckinInfo.read(LoginActivity.this).getAndroidId();
+                                gsfHex = Long.toHexString(gsfLong);
+                                long secTokenLong = LastCheckinInfo.read(LoginActivity.this).getSecurityToken();
+                                secTokenStr = String.valueOf(secTokenLong);
+                            }
 
                             if (assignedPreset == null) {
-                                List<TokenAccount> existing = TokenDatabase.getInstance(LoginActivity.this).getAllAccounts();
-                                assignedPreset = MultiDeviceRegistry.INSTANCE.allocatePreset(existing);
+                                if (existingAcct != null) {
+                                    assignedPreset = MultiDeviceRegistry.createPreset(
+                                            existingAcct.getDeviceName(),
+                                            existingAcct.getDeviceModel(),
+                                            existingAcct.getDeviceBrand(),
+                                            existingAcct.getDeviceFingerprint(),
+                                            existingAcct.getDeviceSdk()
+                                    );
+                                } else {
+                                    List<TokenAccount> existing = TokenDatabase.getInstance(LoginActivity.this).getAllAccounts();
+                                    assignedPreset = MultiDeviceRegistry.INSTANCE.allocatePreset(existing);
+                                }
                             }
 
                             String activeAasToken = (gmsResponse != null && gmsResponse.auth != null) ? gmsResponse.auth : rtResponse.token;
@@ -502,7 +535,7 @@ public class LoginActivity extends AssistantActivity {
                         Log.w(TAG, "onException during retrieveGmsToken", exception);
                         final String msg = exception != null && exception.getMessage() != null ? exception.getMessage() : "Unknown error";
                         runOnUiThread(() -> {
-                            showError("AAS Token Exchange Failed:\n" + msg);
+                            showError("Unable to retrieve device authentication token. Please try again.");
                             setNextButtonText(android.R.string.ok);
                         });
                         state = -2;
@@ -521,6 +554,12 @@ public class LoginActivity extends AssistantActivity {
     }
 
     private boolean checkinFreshDevice() {
+        String reLoginEmail = getIntent().getStringExtra("email");
+        TokenAccount existingAcct = !TextUtils.isEmpty(reLoginEmail) ? TokenDatabase.getInstance(LoginActivity.this).getAccount(reLoginEmail) : null;
+        if (existingAcct != null && !TextUtils.isEmpty(existingAcct.getAndroidId()) && !"0".equals(existingAcct.getAndroidId())) {
+            Log.d(TAG, "Re-login mode for existing account " + reLoginEmail + ". Preserving existing GSM ID: " + existingAcct.getAndroidId());
+            return true;
+        }
         try {
             Log.d(TAG, "Executing fresh check-in for preset: " + (assignedPreset != null ? assignedPreset.getDisplayName() : "default"));
             CheckinManager.checkinFresh(LoginActivity.this, assignedPreset);

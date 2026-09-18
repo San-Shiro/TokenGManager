@@ -61,7 +61,7 @@
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?android:attr/textColorSecondary" />
 
-            <!-- Network Status Pill -->
+            <!-- Network Status Pill (Hidden when connected; only shown on network issues) -->
             <TextView
                 android:id="@+id/tv_network_status"
                 android:layout_width="wrap_content"
@@ -73,9 +73,10 @@
                 android:paddingTop="6dp"
                 android:paddingEnd="14dp"
                 android:paddingBottom="6dp"
-                android:text="● Connecting to TokenG Cloud..."
+                android:text="Connecting..."
                 android:textColor="?attr/colorPrimary"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:visibility="gone" />
 
         </LinearLayout>
 
@@ -238,6 +239,42 @@
                 android:visibility="gone" />
 
         </LinearLayout>
+ 
+         <!-- Dedicated Loading Screen (Shown upon successful sign up / login) -->
+         <LinearLayout
+             android:id="@+id/layout_loading_screen"
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+             android:layout_marginTop="48dp"
+             android:gravity="center_horizontal"
+             android:orientation="vertical"
+             android:visibility="gone">
+
+             <ProgressBar
+                 android:id="@+id/progress_loading_screen"
+                 android:layout_width="54dp"
+                 android:layout_height="54dp"
+                 android:indeterminate="true"
+                 android:indeterminateTint="?attr/colorPrimary" />
+
+             <TextView
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:layout_marginTop="20dp"
+                 android:fontFamily="sans-serif-medium"
+                 android:text="Setting up your vault..."
+                 android:textAppearance="?attr/textAppearanceTitleMedium"
+                 android:textColor="?android:attr/textColorPrimary"
+                 android:textStyle="bold" />
+
+             <TextView
+                 android:layout_width="wrap_content"
+                 android:layout_height="wrap_content"
+                 android:layout_marginTop="6dp"
+                 android:text="Securing your tokens and preparing dashboard"
+                 android:textAppearance="?attr/textAppearanceBodySmall"
+                 android:textColor="?android:attr/textColorSecondary" />
+         </LinearLayout>
 
         <!-- Local Mode Fallback Section (Displayed when Server is Down) -->
         <LinearLayout

@@ -170,7 +170,7 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
                     showAccountOptionsDialog(account)
                 },
                 onRelogin = {
-                    startReLogin(account.email)
+                    startReLogin(account)
                 }
             )
             accountsCategory.addPreference(cardPref)
@@ -211,6 +211,8 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
             val btnManage = itemView.findViewById<View>(R.id.btn_manage_account)
             val btnRelogin = itemView.findViewById<View>(R.id.btn_relogin)
             val statusBadge = itemView.findViewById<TextView>(R.id.account_status_badge)
+            val syncBadge = itemView.findViewById<TextView>(R.id.account_sync_badge)
+            val btnHeaderSignIn = itemView.findViewById<View>(R.id.btn_header_signin)
             val signedOutBanner = itemView.findViewById<View>(R.id.signed_out_banner)
             val cardHeader = itemView.findViewById<View>(R.id.card_header)
 
@@ -222,15 +224,29 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
             textDeviceInfo?.text = "${account.deviceName} (${account.deviceModel}) • Android SDK ${account.deviceSdk}"
             textMasterToken?.text = "Master AAS: $obfuscatedToken"
 
+            // Mark unsynced accounts with a red badge; do NOT mark accounts that are synced
+            if (account.syncStatus != "SYNCED") {
+                syncBadge?.visibility = View.VISIBLE
+                syncBadge?.text = if (account.syncStatus == "LOCAL_ONLY") "LOCAL" else "UNSYNCED"
+            } else {
+                syncBadge?.visibility = View.GONE
+            }
+
+            // Disabled/signed-out accounts: gray out and show direct Sign In button
             if (account.isSignedOut) {
+                itemView.alpha = 0.65f
                 statusBadge?.visibility = View.VISIBLE
                 signedOutBanner?.visibility = View.VISIBLE
+                btnHeaderSignIn?.visibility = View.VISIBLE
                 btnRelogin?.visibility = View.VISIBLE
                 btnGenerate?.visibility = View.GONE
+                btnHeaderSignIn?.setOnClickListener { onRelogin() }
                 btnRelogin?.setOnClickListener { onRelogin() }
             } else {
+                itemView.alpha = 1.0f
                 statusBadge?.visibility = View.GONE
                 signedOutBanner?.visibility = View.GONE
+                btnHeaderSignIn?.visibility = View.GONE
                 btnRelogin?.visibility = View.GONE
                 btnGenerate?.visibility = View.VISIBLE
             }
@@ -406,9 +422,17 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
             .show()
     }
 
-    private fun startReLogin(email: String) {
+    private fun startReLogin(account: TokenAccount) {
         val intent = Intent(context, LoginActivity::class.java).apply {
-            putExtra("email", email)
+            putExtra("email", account.email)
+            putExtra("relogin_mode", true)
+            putExtra("androidId", account.androidId)
+            putExtra("securityToken", account.securityToken)
+            putExtra("deviceName", account.deviceName)
+            putExtra("deviceModel", account.deviceModel)
+            putExtra("deviceBrand", account.deviceBrand)
+            putExtra("deviceFingerprint", account.deviceFingerprint)
+            putExtra("deviceSdk", account.deviceSdk)
         }
         startActivity(intent)
     }
@@ -428,7 +452,7 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
                     MaterialAlertDialogBuilder(context)
                         .setTitle("Account Signed Out")
                         .setMessage("Google rejected the master token for ${account.email} (${result.reason}).\n\nThis account has been marked as signed out. Re-login is required to mint fresh tokens.")
-                        .setPositiveButton("Re-login") { _, _ -> startReLogin(account.email) }
+                        .setPositiveButton("Re-login") { _, _ -> startReLogin(account) }
                         .setNegativeButton(android.R.string.ok, null)
                         .show()
                 }
@@ -446,7 +470,7 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
 
         optionsList.add("Verify Token Status (Google Auth)" to { verifyTokenStatus(account) })
         if (account.isSignedOut) {
-            optionsList.add("Re-login Account" to { startReLogin(account.email) })
+            optionsList.add("Re-login Account" to { startReLogin(account) })
         }
         optionsList.add("View Full Account Details" to { showAccountDetailsDialog(account) })
         optionsList.add("Sync to Central Database" to { syncSingleAccount(account) })

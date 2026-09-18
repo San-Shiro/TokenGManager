@@ -58,6 +58,8 @@ class AuthGateActivity : AppCompatActivity() {
     private lateinit var layoutOfflineBlockedSection: LinearLayout
     private lateinit var btnRetryConnectivity: Button
 
+    private lateinit var layoutLoadingScreen: LinearLayout
+
     private var isRegisterMode = false
     private var currentReachability = BackendSyncManager.Reachability.OFFLINE
 
@@ -108,6 +110,8 @@ class AuthGateActivity : AppCompatActivity() {
 
         layoutOfflineBlockedSection = findViewById(R.id.layout_offline_blocked_section)
         btnRetryConnectivity = findViewById(R.id.btn_retry_connectivity)
+
+        layoutLoadingScreen = findViewById(R.id.layout_loading_screen)
     }
 
     private fun startEntranceAnimations() {
@@ -206,24 +210,25 @@ class AuthGateActivity : AppCompatActivity() {
     private fun applyReachabilityState(reachability: BackendSyncManager.Reachability) {
         when (reachability) {
             BackendSyncManager.Reachability.ONLINE_SERVER_UP -> {
-                tvNetworkStatus.text = "● Cloud Connected (tokeng.sanshiro.qzz.io)"
-                tvNetworkStatus.setTextColor(0xFF10B981.toInt())
+                tvNetworkStatus.visibility = View.GONE
                 layoutAuthCard.visibility = View.VISIBLE
                 layoutLocalModeSection.visibility = View.GONE
                 layoutOfflineUnlockSection.visibility = View.GONE
                 layoutOfflineBlockedSection.visibility = View.GONE
             }
             BackendSyncManager.Reachability.ONLINE_SERVER_DOWN -> {
-                tvNetworkStatus.text = "⚠ Upstream Server Inaccessible"
+                tvNetworkStatus.text = "● Server Temporarily Offline"
                 tvNetworkStatus.setTextColor(0xFFF59E0B.toInt())
+                tvNetworkStatus.visibility = View.VISIBLE
                 layoutAuthCard.visibility = View.VISIBLE
                 layoutLocalModeSection.visibility = View.VISIBLE
                 layoutOfflineUnlockSection.visibility = View.GONE
                 layoutOfflineBlockedSection.visibility = View.GONE
             }
             BackendSyncManager.Reachability.OFFLINE -> {
-                tvNetworkStatus.text = "✕ Offline (No Internet)"
+                tvNetworkStatus.text = "● No Internet Connection"
                 tvNetworkStatus.setTextColor(0xFFEF4444.toInt())
+                tvNetworkStatus.visibility = View.VISIBLE
                 layoutAuthCard.visibility = View.GONE
                 layoutLocalModeSection.visibility = View.GONE
 
@@ -261,8 +266,15 @@ class AuthGateActivity : AppCompatActivity() {
 
         setLoading(true)
         val callback: (Boolean, String?) -> Unit = { success, msg ->
-            setLoading(false)
             if (success) {
+                // Fade out auth form and display sleek loading screen
+                layoutAuthCard.animate().alpha(0f).setDuration(200).withEndAction {
+                    layoutAuthCard.visibility = View.GONE
+                    layoutLoadingScreen.alpha = 0f
+                    layoutLoadingScreen.visibility = View.VISIBLE
+                    layoutLoadingScreen.animate().alpha(1f).setDuration(250).start()
+                }.start()
+
                 // Initialize/unlock local crypto vault with master password
                 val pwdChars = password.toCharArray()
                 if (!TokenCryptoManager.isVaultInitialized(this)) {
@@ -272,26 +284,13 @@ class AuthGateActivity : AppCompatActivity() {
                 }
                 BackendSyncManager.setLocalMode(this, false)
 
-                // Prompt to sync local accounts to cloud if present
-                val localAccounts = TokenDatabase.getInstance(this).getAllAccounts()
-                if (localAccounts.isNotEmpty()) {
-                    MaterialAlertDialogBuilder(this)
-                        .setTitle("Sync Local Accounts?")
-                        .setMessage("Found ${localAccounts.size} account(s) saved on this device. Would you like to sync them to your cloud vault now?")
-                        .setPositiveButton("Sync Now") { _, _ ->
-                            BackendSyncManager.syncAllAccounts(this) { _, _ -> }
-                            navigateToDashboard()
-                        }
-                        .setNegativeButton("Skip") { _, _ ->
-                            navigateToDashboard()
-                        }
-                        .setCancelable(false)
-                        .show()
-                } else {
+                // Smooth transition straight to home dashboard
+                layoutLoadingScreen.postDelayed({
                     navigateToDashboard()
-                }
+                }, 500)
             } else {
-                showError(msg ?: "Authentication failed. Check your credentials.")
+                setLoading(false)
+                showError(BackendSyncManager.sanitizeErrorMessage(msg, isRegisterMode))
             }
         }
 
@@ -373,7 +372,7 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun showError(msg: String) {
-        tvAuthError.text = msg
+        tvAuthError.text = BackendSyncManager.sanitizeErrorMessage(msg, isRegisterMode)
         tvAuthError.visibility = View.VISIBLE
     }
 }

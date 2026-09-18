@@ -61,6 +61,22 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/account_sync_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/badge_signed_out"
+                    android:paddingStart="6dp"
+                    android:paddingEnd="6dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:text="LOCAL"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold"
+                    android:visibility="gone" />
+
+                <TextView
                     android:id="@+id/account_status_badge"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -87,6 +103,24 @@
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?android:attr/textColorSecondary" />
         </LinearLayout>
+
+        <!-- Quick Sign In Button (Visible when disabled/signed out) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_header_signin"
+            style="@style/Widget.Material3.Button"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="6dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="0dp"
+            android:paddingBottom="0dp"
+            android:text="Sign In"
+            android:textSize="12sp"
+            app:cornerRadius="18dp"
+            android:visibility="gone" />
 
         <!-- Chevron Arrow -->
         <ImageView

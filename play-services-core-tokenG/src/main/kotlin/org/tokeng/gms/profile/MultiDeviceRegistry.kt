@@ -173,6 +173,37 @@ object MultiDeviceRegistry {
     }
 
     /**
+     * Create or adapt preset with existing account hardware profile.
+     */
+    @JvmStatic
+    fun createPreset(
+        displayName: String,
+        model: String,
+        brand: String,
+        fingerprint: String,
+        sdkVersion: Int
+    ): DevicePreset {
+        val existing = getPresetByModel(model)
+        if (existing != null) {
+            return existing.copy(
+                displayName = displayName,
+                model = model,
+                brand = brand,
+                fingerprint = if (fingerprint.isNotEmpty()) fingerprint else existing.fingerprint,
+                sdkVersion = if (sdkVersion > 0) sdkVersion else existing.sdkVersion
+            )
+        }
+        val defaultPreset = PRESETS[0]
+        return defaultPreset.copy(
+            displayName = displayName,
+            model = model,
+            brand = brand,
+            fingerprint = if (fingerprint.isNotEmpty()) fingerprint else defaultPreset.fingerprint,
+            sdkVersion = if (sdkVersion > 0) sdkVersion else defaultPreset.sdkVersion
+        )
+    }
+
+    /**
      * Get next preset in rotation after current model.
      */
     fun getNextPreset(currentModel: String?): DevicePreset {

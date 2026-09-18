@@ -21,6 +21,7 @@ buildscript {
     ext.navigationVersion = '2.9.3'
     ext.preferenceVersion = '1.2.1'
     ext.recyclerviewVersion = '1.4.0'
+    ext.swiperefreshlayoutVersion = '1.1.0'
     ext.webkitVersion = '1.14.0'
 
     ext.coroutineVersion = '1.10.2'

@@ -35,8 +35,23 @@ object BackendSyncManager {
     private const val KEY_USER_EMAIL = "backend_user_email"
     private const val KEY_USER_ID = "backend_user_id"
     private const val KEY_LAST_SERVER_TIME = "last_server_time"
+    private const val KEY_LAST_SYNCED_USER = "last_synced_user"
+
+    @Volatile
+    private var lastAutoSyncTimestamp: Long = 0L
+    private const val AUTO_SYNC_DEBOUNCE_MS = 60_000L
 
     const val DEFAULT_BACKEND_URL = "https://tokeng.sanshiro.qzz.io"
+
+    fun getLastSyncedUser(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_LAST_SYNCED_USER, null)
+    }
+
+    fun setLastSyncedUser(context: Context, email: String?) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_LAST_SYNCED_USER, email).apply()
+    }
 
     fun getLastError(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -199,6 +214,146 @@ object BackendSyncManager {
         prefs.edit().putBoolean(KEY_AUTO_SYNC, enabled).apply()
     }
 
+    @JvmStatic
+    fun sanitizeErrorMessage(rawError: String?, isRegister: Boolean = false): String {
+        if (rawError.isNullOrBlank()) {
+            return if (isRegister) {
+                "Unable to create account. Please check your information and try again."
+            } else {
+                "Sign in failed. Please check your email and password."
+            }
+        }
+        val lower = rawError.lowercase()
+
+        // Strip any technical URL, domain, or IP addresses
+        if (lower.contains("tokeng.sanshiro.qzz.io") || lower.contains("http://") || lower.contains("https://")) {
+            if (lower.contains("refused") || lower.contains("unreachable") || lower.contains("failed to connect") || lower.contains("timeout")) {
+                return "Unable to connect to the server. Please check your internet connection."
+            }
+        }
+
+        // Connection & Network errors
+        if (lower.contains("connectexception") || lower.contains("connection refused") || 
+            lower.contains("failed to connect") || lower.contains("network is unreachable") ||
+            lower.contains("unknownhostexception") || lower.contains("no address associated") ||
+            lower.contains("host unreachable") || lower.contains("sockettimeoutexception") ||
+            lower.contains("timed out") || lower.contains("timeout") || lower.contains("sslhandshakeexception") ||
+            lower.contains("route to host") || lower.contains("connection reset") || lower.contains("stream closed") ||
+            lower.contains("broken pipe")) {
+            return "Unable to connect to the server. Please check your internet connection."
+        }
+
+        // HTTP 401 Unauthorized / Invalid Credentials
+        if (lower.contains("401") || lower.contains("unauthorized") || lower.contains("invalid credential") || 
+            lower.contains("wrong password") || lower.contains("bad credentials") || lower.contains("invalid email or password")) {
+            return "Incorrect email or password. Please try again."
+        }
+
+        // HTTP 409 Conflict / Already Registered
+        if (lower.contains("409") || lower.contains("conflict") || lower.contains("already exists") || 
+            lower.contains("duplicate") || lower.contains("user already registered")) {
+            return if (isRegister) {
+                "An account with this email already exists. Please sign in instead."
+            } else {
+                "An account conflict occurred. Please check your details."
+            }
+        }
+
+        // HTTP 400 Bad Request / Validation
+        if (lower.contains("400") || lower.contains("bad request") || lower.contains("validation") ||
+            lower.contains("invalid input") || lower.contains("malformed")) {
+            return "Invalid input. Please ensure your email and password meet requirements."
+        }
+
+        // HTTP 403 Forbidden
+        if (lower.contains("403") || lower.contains("forbidden") || lower.contains("access denied")) {
+            return "Access denied. Please check your account permissions."
+        }
+
+        // HTTP 404 Not Found
+        if (lower.contains("404") || lower.contains("not found")) {
+            return "Service is temporarily unavailable. Please try again later."
+        }
+
+        // HTTP 429 Too Many Requests
+        if (lower.contains("429") || lower.contains("rate limit") || lower.contains("too many requests")) {
+            return "Too many attempts. Please wait a few moments before trying again."
+        }
+
+        // HTTP 500 / 502 / 503 / 504 / Database / Server Errors
+        if (lower.contains("500") || lower.contains("502") || lower.contains("503") || lower.contains("504") ||
+            lower.contains("server error") || lower.contains("internal") || lower.contains("database") ||
+            lower.contains("postgres") || lower.contains("pq:") || lower.contains("sql") || lower.contains("bad gateway")) {
+            return "Server is temporarily unavailable. Please try again in a few moments."
+        }
+
+        // Clean any backend JSON error payload: e.g. {"error":"..."}
+        if (rawError.trim().startsWith("{") && rawError.contains("\"error\"")) {
+            try {
+                val json = JSONObject(rawError)
+                val msg = json.optString("error")
+                if (msg.isNotBlank()) {
+                    return sanitizeErrorMessage(msg, isRegister)
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (rawError.matches(Regex("^HTTP \\d{3}.*"))) {
+            return "Server returned an unexpected response. Please try again later."
+        }
+
+        return if (isRegister) {
+            "Unable to complete registration. Please verify your details and try again."
+        } else {
+            "Unable to sign in. Please verify your credentials and try again."
+        }
+    }
+
+    @JvmStatic
+    @JvmOverloads
+    fun triggerAutoSync(
+        context: Context,
+        force: Boolean = false,
+        callback: ((Boolean) -> Unit)? = null
+    ) {
+        if (!isLoggedIn(context) || isLocalMode(context)) {
+            callback?.invoke(false)
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        if (!force && (now - lastAutoSyncTimestamp < AUTO_SYNC_DEBOUNCE_MS)) {
+            Log.d(TAG, "triggerAutoSync: debounced (last sync was ${now - lastAutoSyncTimestamp}ms ago)")
+            callback?.invoke(true)
+            return
+        }
+
+        lastAutoSyncTimestamp = now
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 1. Pull delta first
+                pullDelta(context) { pullSuccess, _, _ ->
+                    // 2. Push any unsynced local accounts
+                    val db = TokenDatabase.getInstance(context)
+                    val unsynced = db.getUnsyncedAccounts()
+                    if (unsynced.isNotEmpty()) {
+                        syncAccountsBatch(context, unsynced) { pushSuccess, _ ->
+                            callback?.invoke(pullSuccess && pushSuccess)
+                        }
+                    } else {
+                        callback?.invoke(pullSuccess)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "triggerAutoSync exception", e)
+                withContext(Dispatchers.Main) {
+                    callback?.invoke(false)
+                }
+            }
+        }
+    }
+
     /**
      * Test backend server reachability via GET /health.
      */
@@ -273,8 +428,18 @@ object BackendSyncManager {
                     val json = JSONObject(respStr)
                     val token = json.optString("token")
                     val userId = json.optString("user_id")
+
+                    val prevUser = getLastSyncedUser(context)
+                    if (prevUser != null && !prevUser.equals(email.trim(), ignoreCase = true)) {
+                        val db = TokenDatabase.getInstance(context)
+                        db.deleteSyncedAccounts()
+                        db.markRemainingAsLocalOnly()
+                        setLastServerTime(context, "1970-01-01T00:00:00Z")
+                    }
+                    setLastSyncedUser(context, email.trim())
+
                     setAuthToken(context, token)
-                    setUserEmail(context, email)
+                    setUserEmail(context, email.trim())
                     setUserId(context, userId)
                     setLastError(context, null)
                     withContext(Dispatchers.Main) {
@@ -282,16 +447,17 @@ object BackendSyncManager {
                     }
                 } else {
                     val errStr = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
-                    setLastError(context, "Registration failed: $errStr")
+                    val userFriendly = sanitizeErrorMessage(errStr, isRegister = true)
+                    setLastError(context, userFriendly)
                     withContext(Dispatchers.Main) {
-                        callback(false, errStr)
+                        callback(false, userFriendly)
                     }
                 }
             } catch (e: Exception) {
-                val msg = e.message ?: "Network error during registration"
-                setLastError(context, msg)
+                val userFriendly = sanitizeErrorMessage(e.message, isRegister = true)
+                setLastError(context, userFriendly)
                 withContext(Dispatchers.Main) {
-                    callback(false, msg)
+                    callback(false, userFriendly)
                 }
             } finally {
                 conn?.disconnect()
@@ -337,8 +503,18 @@ object BackendSyncManager {
                     val json = JSONObject(respStr)
                     val token = json.optString("token")
                     val userId = json.optString("user_id")
+
+                    val prevUser = getLastSyncedUser(context)
+                    if (prevUser != null && !prevUser.equals(email.trim(), ignoreCase = true)) {
+                        val db = TokenDatabase.getInstance(context)
+                        db.deleteSyncedAccounts()
+                        db.markRemainingAsLocalOnly()
+                        setLastServerTime(context, "1970-01-01T00:00:00Z")
+                    }
+                    setLastSyncedUser(context, email.trim())
+
                     setAuthToken(context, token)
-                    setUserEmail(context, email)
+                    setUserEmail(context, email.trim())
                     setUserId(context, userId)
                     setLastError(context, null)
                     withContext(Dispatchers.Main) {
@@ -346,16 +522,17 @@ object BackendSyncManager {
                     }
                 } else {
                     val errStr = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
-                    setLastError(context, "Login failed: $errStr")
+                    val userFriendly = sanitizeErrorMessage(errStr, isRegister = false)
+                    setLastError(context, userFriendly)
                     withContext(Dispatchers.Main) {
-                        callback(false, errStr)
+                        callback(false, userFriendly)
                     }
                 }
             } catch (e: Exception) {
-                val msg = e.message ?: "Network error during login"
-                setLastError(context, msg)
+                val userFriendly = sanitizeErrorMessage(e.message, isRegister = false)
+                setLastError(context, userFriendly)
                 withContext(Dispatchers.Main) {
-                    callback(false, msg)
+                    callback(false, userFriendly)
                 }
             } finally {
                 conn?.disconnect()
@@ -466,25 +643,26 @@ object BackendSyncManager {
                 } else {
                     val errText = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
                     Log.w(TAG, "Sync push failed: $errText")
-                    setLastError(context, "HTTP $code: $errText")
+                    val userFriendly = sanitizeErrorMessage(errText)
+                    setLastError(context, userFriendly)
                     for (acct in accounts) {
                         db.updateSyncStatus(acct.email, "FAILED", System.currentTimeMillis())
                     }
                     withContext(Dispatchers.Main) {
-                        callback?.invoke(false, errText)
+                        callback?.invoke(false, userFriendly)
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Exception during push", e)
-                val errMsg = e.message ?: "Connection error / server unreachable"
-                setLastError(context, errMsg)
+                val userFriendly = sanitizeErrorMessage(e.message)
+                setLastError(context, userFriendly)
                 for (acct in accounts) {
                     try {
                         db.updateSyncStatus(acct.email, "FAILED", System.currentTimeMillis())
                     } catch (_: Exception) {}
                 }
                 withContext(Dispatchers.Main) {
-                    callback?.invoke(false, errMsg)
+                    callback?.invoke(false, userFriendly)
                 }
             } finally {
                 conn?.disconnect()
@@ -593,11 +771,16 @@ object BackendSyncManager {
                     val instancesArr = json.optJSONArray("instances") ?: JSONArray()
                     val db = TokenDatabase.getInstance(context)
                     var appliedCount = 0
+                    val pulledEmails = mutableSetOf<String>()
+                    val pulledInstanceIds = mutableSetOf<String>()
 
                     for (i in 0 until instancesArr.length()) {
                         val inst = instancesArr.getJSONObject(i)
                         val instanceId = inst.optString("instance_id")
                         val email = inst.optString("email")
+                        if (email.isNotEmpty()) pulledEmails.add(email)
+                        if (instanceId.isNotEmpty()) pulledInstanceIds.add(instanceId)
+
                         val masterToken = inst.optString("master_token")
                         val aasToken = inst.optString("aas_token")
                         val sid = inst.optString("sid")
@@ -639,22 +822,34 @@ object BackendSyncManager {
                         appliedCount++
                     }
 
+                    // Check existing local accounts: any local account not in the pulled server instances
+                    // is flagged as LOCAL_ONLY so it is distinct from cloud-synced accounts
+                    val allLocal = db.getAllAccounts()
+                    for (localAcc in allLocal) {
+                        if (!pulledEmails.contains(localAcc.email) && !pulledInstanceIds.contains(localAcc.instanceId)) {
+                            if (localAcc.syncStatus != "LOCAL_ONLY") {
+                                db.updateSyncStatus(localAcc.email, "LOCAL_ONLY", localAcc.lastSyncAt)
+                            }
+                        }
+                    }
+
                     setLastError(context, null)
                     withContext(Dispatchers.Main) {
                         callback(true, appliedCount, null)
                     }
                 } else {
                     val errText = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
-                    setLastError(context, "Pull failed: $errText")
+                    val userFriendly = sanitizeErrorMessage(errText)
+                    setLastError(context, userFriendly)
                     withContext(Dispatchers.Main) {
-                        callback(false, 0, errText)
+                        callback(false, 0, userFriendly)
                     }
                 }
             } catch (e: Exception) {
-                val errMsg = e.message ?: "Connection error during delta pull"
-                setLastError(context, errMsg)
+                val userFriendly = sanitizeErrorMessage(e.message)
+                setLastError(context, userFriendly)
                 withContext(Dispatchers.Main) {
-                    callback(false, 0, errMsg)
+                    callback(false, 0, userFriendly)
                 }
             } finally {
                 conn?.disconnect()

@@ -26,6 +26,7 @@ dependencies {
     //noinspection GradleDependency
     implementation "androidx.appcompat:appcompat:$appcompatVersion"
     implementation "androidx.preference:preference-ktx:$preferenceVersion"
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:$swiperefreshlayoutVersion"
     //noinspection GradleDependency
     implementation "androidx.webkit:webkit:$webkitVersion"
 

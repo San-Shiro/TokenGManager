@@ -294,6 +294,91 @@ class TokenDatabase private constructor(context: Context) :
     }
 
     @Synchronized
+    fun getUnsyncedAccounts(): List<TokenAccount> {
+        val list = mutableListOf<TokenAccount>()
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        try {
+            cursor = db.query(
+                TABLE_ACCOUNTS,
+                null,
+                "$COL_SYNC_STATUS != ?",
+                arrayOf("SYNCED"),
+                null,
+                null,
+                "$COL_REGISTERED_AT ASC"
+            )
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    list.add(cursorToAccount(cursor))
+                } while (cursor.moveToNext())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get unsynced accounts", e)
+        } finally {
+            cursor?.close()
+        }
+        return list
+    }
+
+    @Synchronized
+    fun getLocalOnlyAccounts(): List<TokenAccount> {
+        val list = mutableListOf<TokenAccount>()
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        try {
+            cursor = db.query(
+                TABLE_ACCOUNTS,
+                null,
+                "$COL_SYNC_STATUS = ? OR $COL_SYNC_STATUS = ?",
+                arrayOf("LOCAL_ONLY", "PENDING"),
+                null,
+                null,
+                "$COL_REGISTERED_AT ASC"
+            )
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    list.add(cursorToAccount(cursor))
+                } while (cursor.moveToNext())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get local-only accounts", e)
+        } finally {
+            cursor?.close()
+        }
+        return list
+    }
+
+    @Synchronized
+    fun deleteSyncedAccounts(): Int {
+        return try {
+            val db = writableDatabase
+            val rows = db.delete(TABLE_ACCOUNTS, "$COL_SYNC_STATUS = ?", arrayOf("SYNCED"))
+            Log.d(TAG, "Deleted previous synced accounts (rows=$rows)")
+            rows
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete synced accounts", e)
+            0
+        }
+    }
+
+    @Synchronized
+    fun markRemainingAsLocalOnly(): Int {
+        return try {
+            val db = writableDatabase
+            val values = ContentValues().apply {
+                put(COL_SYNC_STATUS, "LOCAL_ONLY")
+            }
+            val rows = db.update(TABLE_ACCOUNTS, values, "$COL_SYNC_STATUS != ?", arrayOf("SYNCED"))
+            Log.d(TAG, "Marked remaining accounts as LOCAL_ONLY (rows=$rows)")
+            rows
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to mark remaining accounts as LOCAL_ONLY", e)
+            0
+        }
+    }
+
+    @Synchronized
     fun backupLocalAccounts(): Boolean {
         return try {
             val db = writableDatabase
