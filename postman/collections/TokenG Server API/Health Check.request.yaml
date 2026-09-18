@@ -1,0 +1,16 @@
+$kind: http-request
+name: Health Check
+order: 1000
+method: GET
+url: '{{baseUrl}}/health'
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      let body = {};
+      try { body = pm.response.json(); } catch (e) { body = {}; }
+      pm.test('status is 200', function () { pm.response.to.have.status(200); });
+      pm.test('body status == ok', function () { pm.expect(body.status).to.eql('ok'); });
+      pm.test('body db == up', function () { pm.expect(body.db).to.eql('up'); });

@@ -1,0 +1,15 @@
+$kind: http-request
+name: 'Sync Pull - No Auth (401 negative test)'
+order: 7000
+method: GET
+url: '{{baseUrl}}/api/sync/pull?since={{since}}'
+auth:
+  type: noauth
+queryParams:
+  - key: since
+    value: '{{since}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test('status is 401 Unauthorized', function () { pm.response.to.have.status(401); });

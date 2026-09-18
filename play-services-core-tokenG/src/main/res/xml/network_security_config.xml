@@ -5,7 +5,13 @@
   -->
 
 <network-security-config>
-    <!-- We need to allow cleartext access to certain domains for local wifi location -->
+    <!-- Allow cleartext HTTP for TokenG server and local backends -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">portal.mav.hu</domain>
         <domain includeSubdomains="true">cdwifi.cz</domain>

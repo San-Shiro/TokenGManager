@@ -42,7 +42,24 @@ Output:
 play-services-core-tokenG/build/outputs/apk/default/release/tokeng-release-6.1.0.apk
 ```
 
-## Install
+## Backend Service (`tokeng-server`)
+
+Go-based synchronization and account management middleware for multi-device token sync.
+
+- **Stack**: Go 1.22+, PostgreSQL (pgx pool), Docker (Alpine multi-stage, <35MB).
+- **Features**: Argon2id password hashing, JWT stateless authentication, instance-scoped delta push/pull sync.
+
+### Quick Run with Docker Compose
+
+```sh
+cd tokeng-server
+cp .env.example .env   # Configure DATABASE_URL and JWT_SECRET
+docker compose up -d --build
+```
+
+Health check: `http://<host>:8088/health`
+
+## Install App
 
 ```sh
 adb install -r play-services-core-tokenG/build/outputs/apk/default/release/tokeng-release-6.1.0.apk

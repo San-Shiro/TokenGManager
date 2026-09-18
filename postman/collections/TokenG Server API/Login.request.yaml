@@ -1,0 +1,27 @@
+$kind: http-request
+name: Login
+order: 3000
+method: POST
+url: '{{baseUrl}}/api/auth/login'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{testEmail}}",
+      "password": "{{testPassword}}"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      let body = {};
+      try { body = pm.response.json(); } catch (e) { body = {}; }
+      pm.test('status is 200', function () { pm.response.to.have.status(200); });
+      const token = body.token || body.access_token;
+      pm.test('body has token', function () { pm.expect(token, 'token/access_token').to.be.a('string').and.not.empty; });
+      if (token) { pm.environment.set('authToken', token); }

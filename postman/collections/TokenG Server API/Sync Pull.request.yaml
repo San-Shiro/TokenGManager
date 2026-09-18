@@ -1,0 +1,22 @@
+$kind: http-request
+name: Sync Pull
+order: 5000
+method: GET
+url: '{{baseUrl}}/api/sync/pull?since={{since}}'
+queryParams:
+  - key: since
+    value: '{{since}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      let body = {};
+      try { body = pm.response.json(); } catch (e) { body = {}; }
+      pm.test('status is 200', function () { pm.response.to.have.status(200); });
+      pm.test('body has server_time', function () { pm.expect(body).to.have.property('server_time'); });
+      pm.test('body.instances is an array', function () { pm.expect(body.instances).to.be.an('array'); });
+      const idA = pm.environment.get('instanceIdA');
+      const idB = pm.environment.get('instanceIdB');
+      const ids = Array.isArray(body.instances) ? body.instances.map(function (i) { return i && i.instance_id; }) : [];
+      if (idA) { pm.test('contains instanceIdA', function () { pm.expect(ids).to.include(idA); }); }
+      if (idB) { pm.test('contains instanceIdB', function () { pm.expect(ids).to.include(idB); }); }

@@ -1,0 +1,27 @@
+$kind: http-request
+name: Register
+order: 2000
+method: POST
+url: '{{baseUrl}}/api/auth/register'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{testEmail}}",
+      "password": "{{testPassword}}"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      let body = {};
+      try { body = pm.response.json(); } catch (e) { body = {}; }
+      pm.test('status is 200 or 201', function () { pm.expect([200,201]).to.include(pm.response.code); });
+      const token = body.token || body.access_token;
+      pm.test('response has a token field', function () { pm.expect(token, 'token/access_token').to.be.a('string').and.not.empty; });
+      if (token) { pm.environment.set('authToken', token); }

@@ -92,7 +92,79 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         val screen = preferenceManager.createPreferenceScreen(context)
         preferenceScreen = screen
 
-        // 1. CLOUD SYNC CONTROLS
+        // 1. CLOUD ACCOUNT & SESSION
+        val accountCategory = PreferenceCategory(context).apply {
+            title = "TOKEN-G CLOUD ACCOUNT"
+            layoutResource = R.layout.preference_material_category
+            isIconSpaceReserved = false
+        }
+        screen.addPreference(accountCategory)
+
+        if (!BackendSyncManager.isLoggedIn(context)) {
+            val loginPref = Preference(context).apply {
+                layoutResource = R.layout.preference_material_top
+                key = "pref_cloud_login"
+                title = "Sign In / Register Cloud Account"
+                summary = "Connect to TokenG backend server to sync your credential pool"
+                icon = AppCompatResources.getDrawable(context, R.drawable.ic_accounts)
+                isIconSpaceReserved = true
+                setOnPreferenceClickListener {
+                    showAuthDialog()
+                    true
+                }
+            }
+            accountCategory.addPreference(loginPref)
+        } else {
+            val userEmail = BackendSyncManager.getUserEmail(context) ?: "Cloud User"
+            val sessionPref = Preference(context).apply {
+                layoutResource = R.layout.preference_material_top
+                key = "pref_cloud_session"
+                title = "Signed In: $userEmail"
+                summary = "Tap to switch account or sign out"
+                icon = AppCompatResources.getDrawable(context, R.drawable.ic_accounts)
+                isIconSpaceReserved = true
+                setOnPreferenceClickListener {
+                    MaterialAlertDialogBuilder(context)
+                        .setTitle("Sign Out")
+                        .setMessage("Do you want to sign out from $userEmail?")
+                        .setPositiveButton("Sign Out") { _, _ ->
+                            BackendSyncManager.logout(context)
+                            refreshSyncDashboard(force = true)
+                            view?.let { v -> Snackbar.make(v, "Signed out successfully", Snackbar.LENGTH_SHORT).show() }
+                        }
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show()
+                    true
+                }
+            }
+            accountCategory.addPreference(sessionPref)
+
+            // Pull Delta (Download instances)
+            val pullDeltaPref = Preference(context).apply {
+                layoutResource = R.layout.preference_material_bottom
+                key = "pref_pull_delta"
+                title = "Pull Delta from Cloud"
+                summary = "Download new or updated token instances from your pool"
+                icon = AppCompatResources.getDrawable(context, R.drawable.ic_sync)
+                isIconSpaceReserved = true
+                setOnPreferenceClickListener {
+                    view?.let { v -> Snackbar.make(v, "Pulling delta from cloud...", Snackbar.LENGTH_SHORT).show() }
+                    BackendSyncManager.pullDelta(context) { success, count, err ->
+                        val msg = if (success) {
+                            "✓ Pulled $count instance(s) from cloud!"
+                        } else {
+                            "Pull failed: ${err ?: "unknown"}"
+                        }
+                        view?.let { v -> Snackbar.make(v, msg, Snackbar.LENGTH_LONG).show() }
+                        refreshSyncDashboard(force = true)
+                    }
+                    true
+                }
+            }
+            accountCategory.addPreference(pullDeltaPref)
+        }
+
+        // 2. CLOUD SYNC CONTROLS
         val controlsCategory = PreferenceCategory(context).apply {
             title = "CLOUD SYNC CONTROLS"
             layoutResource = R.layout.preference_material_category
@@ -104,7 +176,7 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         val syncAllPref = Preference(context).apply {
             layoutResource = R.layout.preference_material_top
             key = "pref_sync_all"
-            title = "Sync All Accounts to Database"
+            title = "Push All Accounts to Database"
             summary = "Push all accounts, device identities & tokens to central server"
             icon = AppCompatResources.getDrawable(context, R.drawable.ic_sync)
             isIconSpaceReserved = true
@@ -348,6 +420,57 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
                     BackendSyncManager.setBackendUrl(context, newUrl)
                     refreshSyncDashboard()
                     view?.let { v -> Snackbar.make(v, "Backend URL updated: $newUrl", Snackbar.LENGTH_SHORT).show() }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun showAuthDialog() {
+        val context = requireContext()
+        val layout = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, pad / 2)
+        }
+
+        val emailInput = EditText(context).apply {
+            hint = "Gmail Address (e.g. user@gmail.com)"
+            inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            setText(BackendSyncManager.getUserEmail(context) ?: "")
+        }
+        val passInput = EditText(context).apply {
+            hint = "Password (min 8 chars)"
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        layout.addView(emailInput)
+        layout.addView(passInput)
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle("TokenG Cloud Sign In / Register")
+            .setView(layout)
+            .setPositiveButton("Sign In") { _, _ ->
+                val email = emailInput.text.toString().trim()
+                val pass = passInput.text.toString()
+                if (email.isNotEmpty() && pass.isNotEmpty()) {
+                    view?.let { v -> Snackbar.make(v, "Signing in...", Snackbar.LENGTH_SHORT).show() }
+                    BackendSyncManager.login(context, email, pass) { success, err ->
+                        val msg = if (success) "✓ Signed in as $email" else "⚠ Sign in failed: ${err ?: "unknown"}"
+                        view?.let { v -> Snackbar.make(v, msg, Snackbar.LENGTH_LONG).show() }
+                        refreshSyncDashboard(force = true)
+                    }
+                }
+            }
+            .setNeutralButton("Register") { _, _ ->
+                val email = emailInput.text.toString().trim()
+                val pass = passInput.text.toString()
+                if (email.isNotEmpty() && pass.isNotEmpty()) {
+                    view?.let { v -> Snackbar.make(v, "Registering account...", Snackbar.LENGTH_SHORT).show() }
+                    BackendSyncManager.register(context, email, pass) { success, err ->
+                        val msg = if (success) "✓ Registered & signed in as $email" else "⚠ Registration failed: ${err ?: "unknown"}"
+                        view?.let { v -> Snackbar.make(v, msg, Snackbar.LENGTH_LONG).show() }
+                        refreshSyncDashboard(force = true)
+                    }
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)

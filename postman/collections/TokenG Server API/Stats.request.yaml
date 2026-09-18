@@ -1,0 +1,17 @@
+$kind: http-request
+name: Stats
+order: 6000
+method: GET
+url: '{{baseUrl}}/api/stats'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      let body = {};
+      try { body = pm.response.json(); } catch (e) { body = {}; }
+      pm.test('status is 200', function () { pm.response.to.have.status(200); });
+      pm.test('body is an object', function () { pm.expect(body).to.be.an('object'); });
+      const users = body.total_users !== undefined ? body.total_users : body.users;
+      const instances = body.total_instances !== undefined ? body.total_instances : body.instances;
+      pm.test('total users is a number >= 0', function () { pm.expect(users).to.be.a('number'); pm.expect(users).to.be.at.least(0); });
+      pm.test('total instances is a number >= 0', function () { pm.expect(instances).to.be.a('number'); pm.expect(instances).to.be.at.least(0); });

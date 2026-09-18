@@ -1,0 +1,9 @@
+$kind: collection
+name: TokenG Server API
+description: |-
+  REST contract mirror for the tokeng-server API. Provides health, auth (register/login), sync push/pull, and stats endpoints. Register and Login auto-capture the JWT into {{authToken}}. Recommended run order: Health -> Register (or Login) -> Sync Push -> Sync Pull -> Stats -> negative test.
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{authToken}}'

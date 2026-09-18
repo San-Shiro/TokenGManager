@@ -1,0 +1,31 @@
+name: TokenG Local
+values:
+  - key: baseUrl
+    value: 'http://localhost:8080'
+    enabled: true
+    type: default
+    description: 'Base URL. Android emulator alternative: http://10.0.2.2:8080'
+  - key: testEmail
+    value: tokeng.tester@gmail.com
+    enabled: true
+    type: default
+  - key: testPassword
+    value: Passw0rd123
+    enabled: true
+    type: default
+  - key: authToken
+    value: ''
+    enabled: true
+    type: secret
+  - key: since
+    value: '1970-01-01T00:00:00Z'
+    enabled: true
+    type: default
+  - key: instanceIdA
+    value: ''
+    enabled: true
+    type: default
+  - key: instanceIdB
+    value: ''
+    enabled: true
+    type: default

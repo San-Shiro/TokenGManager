@@ -28,7 +28,8 @@ data class TokenAccount @JvmOverloads constructor(
     val lastValidatedAt: Long = 0L,
     val lastValidationResult: String? = null,
     val signedOutReason: String? = null,
-    val consecutiveAuthFailures: Int = 0
+    val consecutiveAuthFailures: Int = 0,
+    val instanceId: String = java.util.UUID.randomUUID().toString()
 ) {
     val isSignedOut: Boolean
         get() = accountStatus == "SIGNED_OUT"

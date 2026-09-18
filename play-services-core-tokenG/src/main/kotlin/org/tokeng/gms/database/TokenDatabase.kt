@@ -19,7 +19,8 @@ class TokenDatabase private constructor(context: Context) :
         db.execSQL(
             """
             CREATE TABLE IF NOT EXISTS $TABLE_ACCOUNTS (
-                $COL_EMAIL TEXT PRIMARY KEY NOT NULL,
+                $COL_INSTANCE_ID TEXT PRIMARY KEY NOT NULL,
+                $COL_EMAIL TEXT NOT NULL,
                 $COL_MASTER_TOKEN TEXT NOT NULL,
                 $COL_AAS_TOKEN TEXT,
                 $COL_SID TEXT,
@@ -45,6 +46,7 @@ class TokenDatabase private constructor(context: Context) :
             )
             """.trimIndent()
         )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_email ON $TABLE_ACCOUNTS($COL_EMAIL)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_sync ON $TABLE_ACCOUNTS($COL_SYNC_STATUS)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_status ON $TABLE_ACCOUNTS($COL_ACCOUNT_STATUS)")
     }
@@ -60,6 +62,15 @@ class TokenDatabase private constructor(context: Context) :
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_status ON $TABLE_ACCOUNTS($COL_ACCOUNT_STATUS)")
             } catch (e: Exception) {
                 Log.w(TAG, "Failed creating status index", e)
+            }
+        }
+        if (oldVersion < 3) {
+            addColumnIfMissing(db, TABLE_ACCOUNTS, COL_INSTANCE_ID, "TEXT")
+            try {
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_instance ON $TABLE_ACCOUNTS($COL_INSTANCE_ID)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_email ON $TABLE_ACCOUNTS($COL_EMAIL)")
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed creating instance index", e)
             }
         }
     }
@@ -94,6 +105,7 @@ class TokenDatabase private constructor(context: Context) :
         return try {
             val db = writableDatabase
             val values = ContentValues().apply {
+                put(COL_INSTANCE_ID, account.instanceId)
                 put(COL_EMAIL, account.email)
                 put(COL_MASTER_TOKEN, account.masterToken)
                 put(COL_AAS_TOKEN, account.aasToken)
@@ -119,10 +131,78 @@ class TokenDatabase private constructor(context: Context) :
                 put(COL_AUTH_FAIL_COUNT, account.consecutiveAuthFailures)
             }
             val id = db.insertWithOnConflict(TABLE_ACCOUNTS, null, values, SQLiteDatabase.CONFLICT_REPLACE)
-            Log.d(TAG, "Saved account ${account.email} to native database (rowId=$id)")
+            Log.d(TAG, "Saved account ${account.email} (instanceId=${account.instanceId}) to native database (rowId=$id)")
             id != -1L
         } catch (e: Exception) {
             Log.e(TAG, "Failed to insert/update account ${account.email}", e)
+            false
+        }
+    }
+
+    @Synchronized
+    fun getAccountByInstanceId(instanceId: String): TokenAccount? {
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        return try {
+            cursor = db.query(
+                TABLE_ACCOUNTS,
+                null,
+                "$COL_INSTANCE_ID = ?",
+                arrayOf(instanceId),
+                null,
+                null,
+                null
+            )
+            if (cursor != null && cursor.moveToFirst()) {
+                cursorToAccount(cursor)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get account by instanceId $instanceId", e)
+            null
+        } finally {
+            cursor?.close()
+        }
+    }
+
+    @Synchronized
+    fun getAccountsByEmail(email: String): List<TokenAccount> {
+        val list = mutableListOf<TokenAccount>()
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        try {
+            cursor = db.query(
+                TABLE_ACCOUNTS,
+                null,
+                "$COL_EMAIL = ?",
+                arrayOf(email),
+                null,
+                null,
+                "$COL_REGISTERED_AT ASC"
+            )
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    list.add(cursorToAccount(cursor))
+                } while (cursor.moveToNext())
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get accounts for email $email", e)
+        } finally {
+            cursor?.close()
+        }
+        return list
+    }
+
+    @Synchronized
+    fun deleteAccountByInstanceId(instanceId: String): Boolean {
+        return try {
+            val db = writableDatabase
+            val rows = db.delete(TABLE_ACCOUNTS, "$COL_INSTANCE_ID = ?", arrayOf(instanceId))
+            Log.d(TAG, "Deleted account instance $instanceId (rows=$rows)")
+            rows > 0
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete account by instanceId $instanceId", e)
             false
         }
     }
@@ -139,7 +219,7 @@ class TokenDatabase private constructor(context: Context) :
                 arrayOf(email),
                 null,
                 null,
-                null
+                "CASE WHEN $COL_ACCOUNT_STATUS = '$STATUS_ACTIVE' THEN 0 ELSE 1 END, $COL_REGISTERED_AT DESC"
             )
             if (cursor != null && cursor.moveToFirst()) {
                 cursorToAccount(cursor)
@@ -384,17 +464,22 @@ class TokenDatabase private constructor(context: Context) :
             accountStatus = if (c.getColumnIndex(COL_ACCOUNT_STATUS) != -1) (c.getString(c.getColumnIndex(COL_ACCOUNT_STATUS)) ?: STATUS_ACTIVE) else STATUS_ACTIVE,
             lastValidatedAt = if (c.getColumnIndex(COL_LAST_VALIDATED_AT) != -1) c.getLong(c.getColumnIndex(COL_LAST_VALIDATED_AT)) else 0L,
             lastValidationResult = if (c.getColumnIndex(COL_LAST_VALIDATION_RESULT) != -1) c.getString(c.getColumnIndex(COL_LAST_VALIDATION_RESULT)) else null,
-            signedOutReason = if (c.getColumnIndex(COL_SIGNED_OUT_REASON) != -1) c.getString(c.getColumnIndex(COL_SIGNED_OUT_REASON)) else null,
-            consecutiveAuthFailures = if (c.getColumnIndex(COL_AUTH_FAIL_COUNT) != -1) c.getInt(c.getColumnIndex(COL_AUTH_FAIL_COUNT)) else 0
+            consecutiveAuthFailures = if (c.getColumnIndex(COL_AUTH_FAIL_COUNT) != -1) c.getInt(c.getColumnIndex(COL_AUTH_FAIL_COUNT)) else 0,
+            instanceId = if (c.getColumnIndex(COL_INSTANCE_ID) != -1 && !c.isNull(c.getColumnIndex(COL_INSTANCE_ID))) {
+                c.getString(c.getColumnIndex(COL_INSTANCE_ID))
+            } else {
+                c.getString(c.getColumnIndexOrThrow(COL_EMAIL))
+            }
         )
     }
 
     companion object {
         private const val TAG = "TokenDatabase"
         private const val DB_NAME = "tokeng_accounts.db"
-        private const val DB_VERSION = 2
+        private const val DB_VERSION = 3
 
         const val TABLE_ACCOUNTS = "tokeng_accounts"
+        const val COL_INSTANCE_ID = "instance_id"
         const val COL_EMAIL = "email"
         const val COL_MASTER_TOKEN = "master_token"
         const val COL_AAS_TOKEN = "aas_token"

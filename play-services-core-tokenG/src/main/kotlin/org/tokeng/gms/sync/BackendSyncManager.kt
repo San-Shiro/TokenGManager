@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import org.tokeng.gms.database.TokenAccount
 import org.tokeng.gms.database.TokenDatabase
@@ -29,8 +30,12 @@ object BackendSyncManager {
     private const val KEY_API_KEY = "backend_api_key"
     private const val KEY_AUTO_SYNC = "auto_sync_enabled"
     private const val KEY_LAST_ERROR = "last_sync_error"
+    private const val KEY_AUTH_TOKEN = "backend_auth_token"
+    private const val KEY_USER_EMAIL = "backend_user_email"
+    private const val KEY_USER_ID = "backend_user_id"
+    private const val KEY_LAST_SERVER_TIME = "last_server_time"
 
-    const val DEFAULT_BACKEND_URL = "http://192.168.1.4:3000"
+    const val DEFAULT_BACKEND_URL = "http://10.0.2.2:8088"
 
     fun getLastError(context: Context): String? {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -40,39 +45,6 @@ object BackendSyncManager {
     fun setLastError(context: Context, error: String?) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_LAST_ERROR, error).apply()
-    }
-
-    fun testConnection(context: Context, callback: (Boolean, String?) -> Unit) {
-        CoroutineScope(Dispatchers.IO).launch {
-            var conn: HttpURLConnection? = null
-            try {
-                val targetUrl = "${getBackendUrl(context)}/api/health"
-                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 5000
-                    readTimeout = 5000
-                }
-                val code = conn.responseCode
-                withContext(Dispatchers.Main) {
-                    if (code in 200..399) {
-                        setLastError(context, null)
-                        callback(true, "HTTP $code - Backend reachable")
-                    } else {
-                        val msg = "Server responded with HTTP $code"
-                        setLastError(context, msg)
-                        callback(false, msg)
-                    }
-                }
-            } catch (e: Exception) {
-                val msg = e.message ?: "Connection refused / Host unreachable"
-                setLastError(context, msg)
-                withContext(Dispatchers.Main) {
-                    callback(false, msg)
-                }
-            } finally {
-                conn?.disconnect()
-            }
-        }
     }
 
     fun getBackendUrl(context: Context): String {
@@ -95,6 +67,60 @@ object BackendSyncManager {
         prefs.edit().putString(KEY_API_KEY, apiKey.trim()).apply()
     }
 
+    fun getAuthToken(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_AUTH_TOKEN, null)
+    }
+
+    fun setAuthToken(context: Context, token: String?) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_AUTH_TOKEN, token).apply()
+    }
+
+    fun getUserEmail(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_USER_EMAIL, null)
+    }
+
+    fun setUserEmail(context: Context, email: String?) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_USER_EMAIL, email).apply()
+    }
+
+    fun getUserId(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_USER_ID, null)
+    }
+
+    fun setUserId(context: Context, userId: String?) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_USER_ID, userId).apply()
+    }
+
+    fun getLastServerTime(context: Context): String {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getString(KEY_LAST_SERVER_TIME, "1970-01-01T00:00:00Z") ?: "1970-01-01T00:00:00Z"
+    }
+
+    fun setLastServerTime(context: Context, time: String) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putString(KEY_LAST_SERVER_TIME, time).apply()
+    }
+
+    fun isLoggedIn(context: Context): Boolean {
+        return !getAuthToken(context).isNullOrEmpty()
+    }
+
+    fun logout(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit()
+            .remove(KEY_AUTH_TOKEN)
+            .remove(KEY_USER_EMAIL)
+            .remove(KEY_USER_ID)
+            .remove(KEY_LAST_SERVER_TIME)
+            .apply()
+    }
+
     fun isAutoSyncEnabled(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getBoolean(KEY_AUTO_SYNC, true)
@@ -106,92 +132,294 @@ object BackendSyncManager {
     }
 
     /**
-     * Asynchronously sync a single TokenAccount to the remote backend database.
+     * Test backend server reachability via GET /health.
+     */
+    fun testConnection(context: Context, callback: (Boolean, String?) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            var conn: HttpURLConnection? = null
+            try {
+                val targetUrl = "${getBackendUrl(context)}/health"
+                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                }
+                val code = conn.responseCode
+                withContext(Dispatchers.Main) {
+                    if (code in 200..399) {
+                        setLastError(context, null)
+                        callback(true, "HTTP $code - TokenG Server reachable")
+                    } else {
+                        val msg = "Server responded with HTTP $code"
+                        setLastError(context, msg)
+                        callback(false, msg)
+                    }
+                }
+            } catch (e: Exception) {
+                val msg = e.message ?: "Connection refused / Host unreachable"
+                setLastError(context, msg)
+                withContext(Dispatchers.Main) {
+                    callback(false, msg)
+                }
+            } finally {
+                conn?.disconnect()
+            }
+        }
+    }
+
+    /**
+     * Register account on Go backend.
+     */
+    fun register(
+        context: Context,
+        email: String,
+        pass: String,
+        callback: (Boolean, String?) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            var conn: HttpURLConnection? = null
+            try {
+                val targetUrl = "${getBackendUrl(context)}/api/auth/register"
+                val payload = JSONObject().apply {
+                    put("email", email.trim())
+                    put("password", pass)
+                }
+
+                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 8000
+                    readTimeout = 8000
+                    doInput = true
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                }
+
+                OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                    it.write(payload.toString())
+                    it.flush()
+                }
+
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    val respStr = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+                    val json = JSONObject(respStr)
+                    val token = json.optString("token")
+                    val userId = json.optString("user_id")
+                    setAuthToken(context, token)
+                    setUserEmail(context, email)
+                    setUserId(context, userId)
+                    setLastError(context, null)
+                    withContext(Dispatchers.Main) {
+                        callback(true, null)
+                    }
+                } else {
+                    val errStr = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
+                    setLastError(context, "Registration failed: $errStr")
+                    withContext(Dispatchers.Main) {
+                        callback(false, errStr)
+                    }
+                }
+            } catch (e: Exception) {
+                val msg = e.message ?: "Network error during registration"
+                setLastError(context, msg)
+                withContext(Dispatchers.Main) {
+                    callback(false, msg)
+                }
+            } finally {
+                conn?.disconnect()
+            }
+        }
+    }
+
+    /**
+     * Login to Go backend.
+     */
+    fun login(
+        context: Context,
+        email: String,
+        pass: String,
+        callback: (Boolean, String?) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            var conn: HttpURLConnection? = null
+            try {
+                val targetUrl = "${getBackendUrl(context)}/api/auth/login"
+                val payload = JSONObject().apply {
+                    put("email", email.trim())
+                    put("password", pass)
+                }
+
+                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 8000
+                    readTimeout = 8000
+                    doInput = true
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                }
+
+                OutputStreamWriter(conn.outputStream, "UTF-8").use {
+                    it.write(payload.toString())
+                    it.flush()
+                }
+
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    val respStr = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+                    val json = JSONObject(respStr)
+                    val token = json.optString("token")
+                    val userId = json.optString("user_id")
+                    setAuthToken(context, token)
+                    setUserEmail(context, email)
+                    setUserId(context, userId)
+                    setLastError(context, null)
+                    withContext(Dispatchers.Main) {
+                        callback(true, null)
+                    }
+                } else {
+                    val errStr = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
+                    setLastError(context, "Login failed: $errStr")
+                    withContext(Dispatchers.Main) {
+                        callback(false, errStr)
+                    }
+                }
+            } catch (e: Exception) {
+                val msg = e.message ?: "Network error during login"
+                setLastError(context, msg)
+                withContext(Dispatchers.Main) {
+                    callback(false, msg)
+                }
+            } finally {
+                conn?.disconnect()
+            }
+        }
+    }
+
+    /**
+     * Delta push a single TokenAccount to the Go server.
      */
     fun syncAccount(
         context: Context,
         account: TokenAccount,
         callback: ((Boolean, String?) -> Unit)? = null
     ) {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val db = TokenDatabase.getInstance(context)
-                val payload = JSONObject().apply {
-                    put("email", account.email)
-                    put("masterToken", account.masterToken)
-                    put("aasToken", account.aasToken ?: "")
-                    put("sid", account.sid ?: "")
-                    put("lsid", account.lsid ?: "")
-                    put("androidId", account.androidId)
-                    put("securityToken", account.securityToken)
-                    put("registeredAt", account.registeredAt)
-                    put("accountStatus", account.accountStatus)
-                    put("lastValidatedAt", account.lastValidatedAt)
-                    put("signedOutReason", account.signedOutReason ?: "")
+        syncAccountsBatch(context, listOf(account)) { success, err ->
+            callback?.invoke(success, err)
+        }
+    }
 
-                    val deviceObj = JSONObject().apply {
-                        put("name", account.deviceName)
-                        put("model", account.deviceModel)
-                        put("brand", account.deviceBrand)
-                        put("fingerprint", account.deviceFingerprint)
-                        put("sdkVersion", account.deviceSdk)
+    /**
+     * Delta push a batch of TokenAccounts to POST /api/sync/push.
+     */
+    fun syncAccountsBatch(
+        context: Context,
+        accounts: List<TokenAccount>,
+        callback: ((Boolean, String?) -> Unit)? = null
+    ) {
+        if (accounts.isEmpty()) {
+            callback?.invoke(true, null)
+            return
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val db = TokenDatabase.getInstance(context)
+            var conn: HttpURLConnection? = null
+            try {
+                val instancesArr = JSONArray()
+                for (account in accounts) {
+                    val obj = JSONObject().apply {
+                        put("instance_id", account.instanceId)
+                        put("email", account.email)
+                        put("master_token", account.masterToken)
+                        put("aas_token", account.aasToken ?: "")
+                        put("sid", account.sid ?: "")
+                        put("lsid", account.lsid ?: "")
+                        put("android_id", account.androidId)
+                        put("gsf_id", account.androidId)
+                        put("security_token", account.securityToken)
+                        put("device_name", account.deviceName)
+                        put("device_model", account.deviceModel)
+                        put("device_brand", account.deviceBrand)
+                        put("device_fingerprint", account.deviceFingerprint)
+                        put("device_sdk", account.deviceSdk)
+                        put("account_status", account.accountStatus)
+                        put("signed_out_reason", account.signedOutReason ?: "")
+                        put("deleted", false)
                     }
-                    put("device", deviceObj)
+                    instancesArr.put(obj)
                 }
 
-                val targetUrl = "${getBackendUrl(context)}/api/sync-account"
-                Log.d(TAG, "Syncing account ${account.email} to $targetUrl...")
+                val payload = JSONObject().apply {
+                    put("instances", instancesArr)
+                }
 
-                var conn: HttpURLConnection? = null
-                try {
-                    conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                        requestMethod = "POST"
-                        connectTimeout = 10000
-                        readTimeout = 10000
-                        doInput = true
-                        doOutput = true
-                        setRequestProperty("Content-Type", "application/json")
-                        val apiKey = getApiKey(context)
-                        if (apiKey.isNotEmpty()) {
-                            setRequestProperty("X-API-Key", apiKey)
-                        }
+                val targetUrl = "${getBackendUrl(context)}/api/sync/push"
+                Log.d(TAG, "Pushing ${accounts.size} instance(s) to $targetUrl...")
+
+                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "POST"
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    doInput = true
+                    doOutput = true
+                    setRequestProperty("Content-Type", "application/json")
+                    val token = getAuthToken(context)
+                    if (!token.isNullOrEmpty()) {
+                        setRequestProperty("Authorization", "Bearer $token")
+                    }
+                    val apiKey = getApiKey(context)
+                    if (apiKey.isNotEmpty()) {
+                        setRequestProperty("X-API-Key", apiKey)
+                    }
+                }
+
+                OutputStreamWriter(conn.outputStream, "UTF-8").use { writer ->
+                    writer.write(payload.toString())
+                    writer.flush()
+                }
+
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    val respText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+                    Log.d(TAG, "Instances pushed successfully: $respText")
+                    val respJson = JSONObject(respText)
+                    val serverTime = respJson.optString("server_time")
+                    if (serverTime.isNotEmpty()) {
+                        setLastServerTime(context, serverTime)
                     }
 
-                    OutputStreamWriter(conn.outputStream, "UTF-8").use { writer ->
-                        writer.write(payload.toString())
-                        writer.flush()
+                    for (acct in accounts) {
+                        db.updateSyncStatus(acct.email, "SYNCED", System.currentTimeMillis())
                     }
-
-                    val responseCode = conn.responseCode
-                    if (responseCode in 200..299) {
-                        val respText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
-                        Log.d(TAG, "Account ${account.email} synced successfully: $respText")
-                        db.updateSyncStatus(account.email, "SYNCED", System.currentTimeMillis())
-                        withContext(Dispatchers.Main) {
-                            callback?.invoke(true, null)
-                        }
-                    } else {
-                        val errText = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $responseCode"
-                        Log.w(TAG, "Sync failed for ${account.email}: $errText")
-                        setLastError(context, "HTTP $responseCode: $errText")
-                        db.updateSyncStatus(account.email, "FAILED", System.currentTimeMillis())
-                        withContext(Dispatchers.Main) {
-                            callback?.invoke(false, errText)
-                        }
+                    setLastError(context, null)
+                    withContext(Dispatchers.Main) {
+                        callback?.invoke(true, null)
                     }
-                } finally {
-                    conn?.disconnect()
+                } else {
+                    val errText = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
+                    Log.w(TAG, "Sync push failed: $errText")
+                    setLastError(context, "HTTP $code: $errText")
+                    for (acct in accounts) {
+                        db.updateSyncStatus(acct.email, "FAILED", System.currentTimeMillis())
+                    }
+                    withContext(Dispatchers.Main) {
+                        callback?.invoke(false, errText)
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Exception during sync for ${account.email}", e)
+                Log.e(TAG, "Exception during push", e)
                 val errMsg = e.message ?: "Connection error / server unreachable"
                 setLastError(context, errMsg)
-                try {
-                    TokenDatabase.getInstance(context).updateSyncStatus(account.email, "FAILED", System.currentTimeMillis())
-                } catch (_: Exception) {}
+                for (acct in accounts) {
+                    try {
+                        db.updateSyncStatus(acct.email, "FAILED", System.currentTimeMillis())
+                    } catch (_: Exception) {}
+                }
                 withContext(Dispatchers.Main) {
                     callback?.invoke(false, errMsg)
                 }
+            } finally {
+                conn?.disconnect()
             }
         }
     }
@@ -242,31 +470,166 @@ object BackendSyncManager {
     }
 
     /**
-     * Sync all accounts stored in TokenDatabase.
+     * Sync all accounts stored in TokenDatabase to Go backend.
      */
     fun syncAllAccounts(
         context: Context,
         callback: ((Int, Int) -> Unit)? = null
     ) {
-        CoroutineScope(Dispatchers.IO).launch {
-            val accounts = TokenDatabase.getInstance(context).getAllAccounts()
-            var successCount = 0
-            var failCount = 0
+        val accounts = TokenDatabase.getInstance(context).getAllAccounts()
+        if (accounts.isEmpty()) {
+            callback?.invoke(0, 0)
+            return
+        }
 
-            if (accounts.isEmpty()) {
-                withContext(Dispatchers.Main) {
-                    callback?.invoke(0, 0)
-                }
-                return@launch
+        syncAccountsBatch(context, accounts) { success, _ ->
+            if (success) {
+                callback?.invoke(accounts.size, 0)
+            } else {
+                callback?.invoke(0, accounts.size)
             }
+        }
+    }
 
-            for (account in accounts) {
-                syncAccount(context, account) { success, _ ->
-                    if (success) successCount++ else failCount++
-                    if (successCount + failCount == accounts.size) {
-                        callback?.invoke(successCount, failCount)
+    /**
+     * Delta pull accounts from Go server (GET /api/sync/pull?since=...).
+     */
+    fun pullDelta(
+        context: Context,
+        callback: (Boolean, Int, String?) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            var conn: HttpURLConnection? = null
+            try {
+                val since = getLastServerTime(context)
+                val targetUrl = "${getBackendUrl(context)}/api/sync/pull?since=$since"
+                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 10000
+                    readTimeout = 10000
+                    val token = getAuthToken(context)
+                    if (!token.isNullOrEmpty()) {
+                        setRequestProperty("Authorization", "Bearer $token")
                     }
                 }
+
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    val respText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+                    val json = JSONObject(respText)
+                    val serverTime = json.optString("server_time")
+                    if (serverTime.isNotEmpty()) {
+                        setLastServerTime(context, serverTime)
+                    }
+
+                    val instancesArr = json.optJSONArray("instances") ?: JSONArray()
+                    val db = TokenDatabase.getInstance(context)
+                    var appliedCount = 0
+
+                    for (i in 0 until instancesArr.length()) {
+                        val inst = instancesArr.getJSONObject(i)
+                        val instanceId = inst.optString("instance_id")
+                        val email = inst.optString("email")
+                        val masterToken = inst.optString("master_token")
+                        val aasToken = inst.optString("aas_token")
+                        val sid = inst.optString("sid")
+                        val lsid = inst.optString("lsid")
+                        val androidId = inst.optString("android_id")
+                        val securityToken = inst.optString("security_token")
+                        val deviceName = inst.optString("device_name", "Unknown Device")
+                        val deviceModel = inst.optString("device_model", "Unknown Model")
+                        val deviceBrand = inst.optString("device_brand", "Unknown Brand")
+                        val deviceFingerprint = inst.optString("device_fingerprint", "")
+                        val deviceSdk = inst.optInt("device_sdk", 34)
+                        val accountStatus = inst.optString("account_status", "ACTIVE")
+                        val signedOutReason = inst.optString("signed_out_reason")
+                        val deleted = inst.optBoolean("deleted", false)
+
+                        if (deleted) {
+                            db.deleteAccountByInstanceId(instanceId)
+                        } else {
+                            val account = TokenAccount(
+                                email = email,
+                                masterToken = masterToken,
+                                aasToken = if (aasToken.isNotEmpty()) aasToken else null,
+                                sid = if (sid.isNotEmpty()) sid else null,
+                                lsid = if (lsid.isNotEmpty()) lsid else null,
+                                androidId = androidId,
+                                securityToken = securityToken,
+                                deviceName = deviceName,
+                                deviceModel = deviceModel,
+                                deviceBrand = deviceBrand,
+                                deviceFingerprint = deviceFingerprint,
+                                deviceSdk = deviceSdk,
+                                syncStatus = "SYNCED",
+                                accountStatus = accountStatus,
+                                signedOutReason = if (signedOutReason.isNotEmpty()) signedOutReason else null,
+                                instanceId = instanceId
+                            )
+                            db.insertOrUpdate(account)
+                        }
+                        appliedCount++
+                    }
+
+                    setLastError(context, null)
+                    withContext(Dispatchers.Main) {
+                        callback(true, appliedCount, null)
+                    }
+                } else {
+                    val errText = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
+                    setLastError(context, "Pull failed: $errText")
+                    withContext(Dispatchers.Main) {
+                        callback(false, 0, errText)
+                    }
+                }
+            } catch (e: Exception) {
+                val errMsg = e.message ?: "Connection error during delta pull"
+                setLastError(context, errMsg)
+                withContext(Dispatchers.Main) {
+                    callback(false, 0, errMsg)
+                }
+            } finally {
+                conn?.disconnect()
+            }
+        }
+    }
+
+    /**
+     * Retrieve global stats from Go backend (GET /api/stats).
+     */
+    fun getGlobalStats(
+        context: Context,
+        callback: (Boolean, JSONObject?, String?) -> Unit
+    ) {
+        CoroutineScope(Dispatchers.IO).launch {
+            var conn: HttpURLConnection? = null
+            try {
+                val targetUrl = "${getBackendUrl(context)}/api/stats"
+                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 5000
+                    readTimeout = 5000
+                }
+
+                val code = conn.responseCode
+                if (code in 200..299) {
+                    val respText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+                    val json = JSONObject(respText)
+                    withContext(Dispatchers.Main) {
+                        callback(true, json, null)
+                    }
+                } else {
+                    val errText = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
+                    withContext(Dispatchers.Main) {
+                        callback(false, null, errText)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    callback(false, null, e.message)
+                }
+            } finally {
+                conn?.disconnect()
             }
         }
     }
