@@ -17,6 +17,8 @@ import (
 	"github.com/San-Shiro/tokeng-server/internal/store"
 )
 
+const Version = "6.1.0"
+
 func main() {
 	healthCheckFlag := flag.Bool("healthcheck", false, "run healthcheck query against localhost and exit")
 	flag.Parse()
@@ -34,7 +36,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	log.Printf("[TOKEN-G] Starting tokeng-server on port %s...", cfg.Port)
+	log.Printf("[TOKEN-G] Starting tokeng-server v%s on port %s...", Version, cfg.Port)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

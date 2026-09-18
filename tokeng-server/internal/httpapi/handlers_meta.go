@@ -22,23 +22,27 @@ func NewMetaHandler(pool *pgxpool.Pool, instanceStore *store.InstanceStore) *Met
 	}
 }
 
+const ServerVersion = "6.1.0"
+
 func (h *MetaHandler) Health(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
 	if err := h.pool.Ping(ctx); err != nil {
 		writeJSON(w, http.StatusServiceUnavailable, model.HealthResponse{
-			Status: "degraded",
-			DB:     "down",
-			Time:   time.Now().UTC().Format(time.RFC3339),
+			Status:  "degraded",
+			DB:      "down",
+			Version: ServerVersion,
+			Time:    time.Now().UTC().Format(time.RFC3339),
 		})
 		return
 	}
 
 	writeJSON(w, http.StatusOK, model.HealthResponse{
-		Status: "ok",
-		DB:     "up",
-		Time:   time.Now().UTC().Format(time.RFC3339),
+		Status:  "ok",
+		DB:      "up",
+		Version: ServerVersion,
+		Time:    time.Now().UTC().Format(time.RFC3339),
 	})
 }
 

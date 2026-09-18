@@ -88,9 +88,10 @@ type GlobalStatsResponse struct {
 
 // HealthResponse returns on GET /health
 type HealthResponse struct {
-	Status string `json:"status"`
-	DB     string `json:"db"`
-	Time   string `json:"time"`
+	Status  string `json:"status"`
+	DB      string `json:"db"`
+	Version string `json:"version"`
+	Time    string `json:"time"`
 }
 
 // ErrorResponse standard error envelope
