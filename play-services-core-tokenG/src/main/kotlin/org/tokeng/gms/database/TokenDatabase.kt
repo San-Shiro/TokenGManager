@@ -54,6 +54,15 @@ class TokenDatabase private constructor(context: Context) :
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_email ON $TABLE_ACCOUNTS($COL_EMAIL)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_sync ON $TABLE_ACCOUNTS($COL_SYNC_STATUS)")
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_tokeng_status ON $TABLE_ACCOUNTS($COL_ACCOUNT_STATUS)")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS $TABLE_DELETED_INSTANCES (
+                $COL_INSTANCE_ID TEXT PRIMARY KEY NOT NULL,
+                $COL_EMAIL TEXT NOT NULL,
+                deleted_at INTEGER NOT NULL
+            )
+            """.trimIndent()
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -78,6 +87,17 @@ class TokenDatabase private constructor(context: Context) :
             } catch (e: Exception) {
                 Log.w(TAG, "Failed creating instance index or backfilling", e)
             }
+        }
+        if (oldVersion < 4) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS $TABLE_DELETED_INSTANCES (
+                    $COL_INSTANCE_ID TEXT PRIMARY KEY NOT NULL,
+                    $COL_EMAIL TEXT NOT NULL,
+                    deleted_at INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
         }
     }
 
@@ -112,6 +132,8 @@ class TokenDatabase private constructor(context: Context) :
             val db = writableDatabase
             // Clean up any existing row with this email but different instanceId to guarantee uniqueness per email
             db.delete(TABLE_ACCOUNTS, "$COL_EMAIL = ? AND $COL_INSTANCE_ID != ?", arrayOf(account.email, account.instanceId))
+            // Cancel any pending tombstone if this account is being re-added or restored
+            db.delete(TABLE_DELETED_INSTANCES, "$COL_INSTANCE_ID = ? OR $COL_EMAIL = ?", arrayOf(account.instanceId, account.email))
 
             val values = ContentValues().apply {
                 put(COL_INSTANCE_ID, account.instanceId)
@@ -284,12 +306,78 @@ class TokenDatabase private constructor(context: Context) :
         }
     }
 
+    /**
+     * Deletes account locally and records a durable tombstone for cloud synchronization.
+     * Returns the instanceId that was marked deleted.
+     */
+    @Synchronized
+    fun markAccountDeleted(email: String): String? {
+        val db = writableDatabase
+        return try {
+            val account = getAccount(email)
+            val instanceId = account?.instanceId
+            if (instanceId != null) {
+                val values = ContentValues().apply {
+                    put(COL_INSTANCE_ID, instanceId)
+                    put(COL_EMAIL, email)
+                    put("deleted_at", System.currentTimeMillis())
+                }
+                db.insertWithOnConflict(TABLE_DELETED_INSTANCES, null, values, SQLiteDatabase.CONFLICT_REPLACE)
+                Log.i(TAG, "Recorded tombstone for deleted account $email (instanceId=$instanceId)")
+            }
+            deleteAccount(email)
+            instanceId
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to markAccountDeleted for $email", e)
+            null
+        }
+    }
+
+    @Synchronized
+    fun getPendingDeletedInstances(): List<String> {
+        val list = mutableListOf<String>()
+        val db = readableDatabase
+        var cursor: Cursor? = null
+        return try {
+            cursor = db.query(TABLE_DELETED_INSTANCES, arrayOf(COL_INSTANCE_ID), null, null, null, null, null)
+            if (cursor != null && cursor.moveToFirst()) {
+                do {
+                    list.add(cursor.getString(0))
+                } while (cursor.moveToNext())
+            }
+            list
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get pending deleted instances", e)
+            list
+        } finally {
+            cursor?.close()
+        }
+    }
+
+    @Synchronized
+    fun removeDeletedInstances(instanceIds: List<String>): Int {
+        if (instanceIds.isEmpty()) return 0
+        val db = writableDatabase
+        return try {
+            var count = 0
+            for (id in instanceIds) {
+                count += db.delete(TABLE_DELETED_INSTANCES, "$COL_INSTANCE_ID = ?", arrayOf(id))
+            }
+            Log.d(TAG, "Cleared $count tombstone(s) from $TABLE_DELETED_INSTANCES")
+            count
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to remove deleted instances", e)
+            0
+        }
+    }
+
     @Synchronized
     fun deleteAllAccounts(): Boolean {
         return try {
             val db = writableDatabase
             val rows = db.delete(TABLE_ACCOUNTS, null, null)
-            Log.d(TAG, "Deleted all accounts (rows=$rows)")
+            db.delete(TABLE_DELETED_INSTANCES, null, null)
+            Log.d(TAG, "Deleted all accounts (rows=$rows) and cleared all tombstones")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Failed to delete all accounts", e)
@@ -536,6 +624,9 @@ class TokenDatabase private constructor(context: Context) :
                 put(COL_LAST_VALIDATION_RESULT, "INVALID")
             }
             val rows = db.update(TABLE_ACCOUNTS, values, "$COL_EMAIL = ? AND $COL_MASTER_TOKEN = ?", arrayOf(email, masterToken))
+            if (rows > 0) {
+                db.execSQL("UPDATE $TABLE_ACCOUNTS SET $COL_SYNC_STATUS = 'PENDING' WHERE $COL_EMAIL = ? AND $COL_SYNC_STATUS != 'LOCAL_ONLY'", arrayOf(email))
+            }
             Log.w(TAG, "Account $email marked SIGNED_OUT (reason: $reason, rows=$rows)")
             rows > 0
         } catch (e: Exception) {
@@ -556,6 +647,9 @@ class TokenDatabase private constructor(context: Context) :
                 }
             }
             val rows = db.update(TABLE_ACCOUNTS, values, "$COL_EMAIL = ?", arrayOf(email))
+            if (rows > 0) {
+                db.execSQL("UPDATE $TABLE_ACCOUNTS SET $COL_SYNC_STATUS = 'PENDING' WHERE $COL_EMAIL = ? AND $COL_SYNC_STATUS != 'LOCAL_ONLY'", arrayOf(email))
+            }
             rows > 0
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update account status for $email", e)
@@ -599,9 +693,10 @@ class TokenDatabase private constructor(context: Context) :
     companion object {
         private const val TAG = "TokenDatabase"
         private const val DB_NAME = "tokeng_accounts.db"
-        private const val DB_VERSION = 3
+        private const val DB_VERSION = 4
 
         const val TABLE_ACCOUNTS = "tokeng_accounts"
+        const val TABLE_DELETED_INSTANCES = "deleted_instances"
         const val COL_INSTANCE_ID = "instance_id"
         const val COL_EMAIL = "email"
         const val COL_MASTER_TOKEN = "master_token"

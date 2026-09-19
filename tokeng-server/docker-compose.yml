@@ -1,16 +1,16 @@
 services:
   tokeng-server:
     build: .
-    image: tokeng-server:${VERSION:-7.0.0}
+    image: tokeng-server:${VERSION:-7.1.0}
     container_name: tokeng-server
     labels:
       org.tokeng.service: "tokeng-server"
-      org.tokeng.version: "7.0.0"
+      org.tokeng.version: "7.1.0"
     restart: unless-stopped
     ports:
       - "${PORT:-8088}:${PORT:-8088}"
     environment:
-      - VERSION=${VERSION:-7.0.0}
+      - VERSION=${VERSION:-7.1.0}
       - PORT=${PORT:-8088}
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}

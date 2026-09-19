@@ -83,8 +83,16 @@ object BackendSyncManager {
     }
 
     fun setBackendUrl(context: Context, url: String) {
+        val cleanUrl = url.trim().trimEnd('/')
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_BACKEND_URL, url.trim().trimEnd('/')).apply()
+        val current = prefs.getString(KEY_BACKEND_URL, DEFAULT_BACKEND_URL)
+        if (current != cleanUrl) {
+            prefs.edit()
+                .putString(KEY_BACKEND_URL, cleanUrl)
+                .putString(KEY_LAST_SERVER_TIME, "1970-01-01T00:00:00Z")
+                .apply()
+            lastAutoSyncTimestamp = 0L
+        }
     }
 
     fun getApiKey(context: Context): String {
@@ -385,12 +393,13 @@ object BackendSyncManager {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 1. Push any unsynced local accounts first so new accounts are uploaded to cloud
+                // 1. Push any unsynced local accounts and pending deletions first
                 val db = TokenDatabase.getInstance(context)
                 val unsynced = db.getUnsyncedAccounts().filter { it.syncStatus != "LOCAL_ONLY" }
+                val pendingDeletions = db.getPendingDeletedInstances()
                 val performPush = { onPushComplete: (Boolean) -> Unit ->
-                    if (unsynced.isNotEmpty()) {
-                        syncAccountsBatch(context, unsynced) { pushSuccess, _ ->
+                    if (unsynced.isNotEmpty() || pendingDeletions.isNotEmpty()) {
+                        syncAccountsBatch(context, unsynced, pendingDeletions) { pushSuccess, _ ->
                             onPushComplete(pushSuccess)
                         }
                     } else {
@@ -605,12 +614,20 @@ object BackendSyncManager {
     /**
      * Delta push a batch of TokenAccounts to POST /api/sync/push.
      */
+    @JvmStatic
+    @JvmOverloads
     fun syncAccountsBatch(
         context: Context,
         accounts: List<TokenAccount>,
+        deletedInstanceIds: List<String> = emptyList(),
         callback: ((Boolean, String?) -> Unit)? = null
     ) {
-        if (accounts.isEmpty()) {
+        if (isLocalMode(context) || !isLoggedIn(context)) {
+            callback?.invoke(false, "Local mode or not logged in")
+            return
+        }
+
+        if (accounts.isEmpty() && deletedInstanceIds.isEmpty()) {
             callback?.invoke(true, null)
             return
         }
@@ -643,12 +660,29 @@ object BackendSyncManager {
                     instancesArr.put(obj)
                 }
 
+                for (delId in deletedInstanceIds) {
+                    instancesArr.put(JSONObject().apply {
+                        put("instance_id", delId)
+                        put("email", "")
+                        put("master_token", "")
+                        put("android_id", "")
+                        put("security_token", "")
+                        put("device_name", "")
+                        put("device_model", "")
+                        put("device_brand", "")
+                        put("device_fingerprint", "")
+                        put("device_sdk", 34)
+                        put("account_status", "ACTIVE")
+                        put("deleted", true)
+                    })
+                }
+
                 val payload = JSONObject().apply {
                     put("instances", instancesArr)
                 }
 
                 val targetUrl = "${getBackendUrl(context)}/api/sync/push"
-                Log.d(TAG, "Pushing ${accounts.size} instance(s) to $targetUrl...")
+                Log.d(TAG, "Pushing ${accounts.size} active and ${deletedInstanceIds.size} deleted instance(s) to $targetUrl...")
 
                 conn = openBackendConnection(targetUrl, "POST", 15000, 15000).apply {
                     doInput = true
@@ -676,6 +710,9 @@ object BackendSyncManager {
                     for (acct in accounts) {
                         db.updateSyncStatus(acct.email, "SYNCED", System.currentTimeMillis())
                     }
+                    if (deletedInstanceIds.isNotEmpty()) {
+                        db.removeDeletedInstances(deletedInstanceIds)
+                    }
                     setLastError(context, null)
                     withContext(Dispatchers.Main) {
                         callback?.invoke(true, null)
@@ -685,8 +722,10 @@ object BackendSyncManager {
                     Log.w(TAG, "Sync push failed: $errText")
                     val userFriendly = sanitizeErrorMessage(errText)
                     setLastError(context, userFriendly)
-                    for (acct in accounts) {
-                        db.updateSyncStatus(acct.email, "FAILED", System.currentTimeMillis())
+                    if (!isLocalMode(context) && isLoggedIn(context)) {
+                        for (acct in accounts) {
+                            db.updateSyncStatus(acct.email, "FAILED", System.currentTimeMillis())
+                        }
                     }
                     withContext(Dispatchers.Main) {
                         callback?.invoke(false, userFriendly)
@@ -696,10 +735,12 @@ object BackendSyncManager {
                 Log.e(TAG, "Exception during push", e)
                 val userFriendly = sanitizeErrorMessage(e.message)
                 setLastError(context, userFriendly)
-                for (acct in accounts) {
-                    try {
-                        db.updateSyncStatus(acct.email, "FAILED", System.currentTimeMillis())
-                    } catch (_: Exception) {}
+                if (!isLocalMode(context) && isLoggedIn(context)) {
+                    for (acct in accounts) {
+                        try {
+                            db.updateSyncStatus(acct.email, "FAILED", System.currentTimeMillis())
+                        } catch (_: Exception) {}
+                    }
                 }
                 withContext(Dispatchers.Main) {
                     callback?.invoke(false, userFriendly)
@@ -780,10 +821,16 @@ object BackendSyncManager {
     /**
      * Delta pull accounts from Go server (GET /api/sync/pull?since=...).
      */
+    @JvmStatic
     fun pullDelta(
         context: Context,
         callback: (Boolean, Int, String?) -> Unit
     ) {
+        if (isLocalMode(context) || !isLoggedIn(context)) {
+            callback(false, 0, "Local mode or not logged in")
+            return
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             var conn: HttpURLConnection? = null
             try {

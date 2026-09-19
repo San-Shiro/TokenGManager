@@ -396,7 +396,7 @@
             android:layout_marginTop="28dp"
             android:layout_marginBottom="16dp"
             android:gravity="center"
-            android:text="TokenG v7.0.0"
+            android:text="TokenG v7.1.0"
             android:textAppearance="?attr/textAppearanceBodySmall"
             android:textColor="?android:attr/textColorSecondary"
             android:alpha="0.7" />

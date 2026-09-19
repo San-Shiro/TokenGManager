@@ -512,7 +512,10 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
             .setTitle("Remove Account")
             .setMessage("Are you sure you want to remove ${account.email} from TokenG? All local tokens and device registration for this account will be erased.")
             .setPositiveButton("Remove") { _, _ ->
-                TokenDatabase.getInstance(context).deleteAccount(account.email)
+                TokenDatabase.getInstance(context).markAccountDeleted(account.email)
+                if (BackendSyncManager.isLoggedIn(context) && !BackendSyncManager.isLocalMode(context)) {
+                    BackendSyncManager.triggerAutoSync(context, force = true)
+                }
                 view?.let { v -> Snackbar.make(v, "Removed ${account.email}", Snackbar.LENGTH_SHORT).show() }
                 refreshDashboard()
             }

@@ -463,6 +463,12 @@ public class LoginActivity extends AssistantActivity {
                         try {
                             String reLoginEmail = getIntent().getStringExtra("email");
                             TokenAccount existingAcct = !TextUtils.isEmpty(reLoginEmail) ? TokenDatabase.getInstance(LoginActivity.this).getAccount(reLoginEmail) : null;
+                            if (existingAcct == null) {
+                                existingAcct = TokenDatabase.getInstance(LoginActivity.this).getAccount(rtResponse.email);
+                            }
+                            String targetInstanceId = (existingAcct != null && !TextUtils.isEmpty(existingAcct.getInstanceId()))
+                                    ? existingAcct.getInstanceId()
+                                    : java.util.UUID.randomUUID().toString();
 
                             String gsfHex;
                             String secTokenStr;
@@ -512,14 +518,17 @@ public class LoginActivity extends AssistantActivity {
                                     googleUserId,
                                     "PENDING",
                                     System.currentTimeMillis(),
-                                    0L
+                                    0L,
+                                    targetInstanceId
                             );
 
                             TokenDatabase.getInstance(LoginActivity.this).insertOrUpdate(tokenAccount);
                             Log.d(TAG, "Saved account to native TokenDatabase: " + tokenAccount.getEmail());
 
                             Context appContext = getApplicationContext();
-                            if (BackendSyncManager.INSTANCE.isAutoSyncEnabled(appContext)) {
+                            if (BackendSyncManager.INSTANCE.isAutoSyncEnabled(appContext) &&
+                                    !BackendSyncManager.INSTANCE.isLocalMode(appContext) &&
+                                    BackendSyncManager.INSTANCE.isLoggedIn(appContext)) {
                                 BackendSyncManager.INSTANCE.syncAccount(appContext, tokenAccount, null);
                                 BackendSyncManager.INSTANCE.triggerAutoSync(appContext, true, null);
                             }

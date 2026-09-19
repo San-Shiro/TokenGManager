@@ -82,8 +82,8 @@ allprojects {
     apply plugin: 'idea'
 
     group = 'org.microg.gms'
-    ext.appVersionName = '7.0.0'
-    ext.appVersionCode = 255035000
+    ext.appVersionName = '7.1.0'
+    ext.appVersionCode = 255035001
     ext.baseVersion = ext.appVersionCode.toString()[0..1] + '.' + ext.appVersionCode.toString()[2..3] + '.' + ext.appVersionCode.toString()[4..5]
     version = ext.appVersionName
     ext.isReleaseVersion = false

@@ -1,6 +1,6 @@
-# TokenG API Gateway Service (`tokeng-server` v7.0.0)
+# TokenG API Gateway Service (`tokeng-server` v7.1.0)
 
-A high-concurrency, ultra-lightweight REST API gateway written in Go that securely connects to the remote TokenG PostgreSQL database (`169.58.138.108:25432`). Version-aligned with TokenG Android app **v7.0.0**.
+A high-concurrency, ultra-lightweight REST API gateway written in Go that securely connects to the remote TokenG PostgreSQL database (`169.58.138.108:25432`). Version-aligned with TokenG Android app **v7.1.0**.
 
 ## Security Architecture
 - **Zero Client Credentials**: No PostgreSQL credentials or drivers reside in the Android client APK.

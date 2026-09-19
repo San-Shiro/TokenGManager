@@ -22,7 +22,7 @@ func NewMetaHandler(pool *pgxpool.Pool, instanceStore *store.InstanceStore) *Met
 	}
 }
 
-const ServerVersion = "7.0.0"
+const ServerVersion = "7.1.0"
 
 func (h *MetaHandler) Health(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)

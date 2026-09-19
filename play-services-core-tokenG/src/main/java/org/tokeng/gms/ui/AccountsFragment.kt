@@ -267,7 +267,11 @@ class AccountsFragment : PreferenceFragmentCompat() {
             override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
                 if (!undoRequested && isAdded) {
                     viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                        TokenDatabase.getInstance(requireContext()).deleteAccount(account.email)
+                        val ctx = requireContext()
+                        TokenDatabase.getInstance(ctx).markAccountDeleted(account.email)
+                        if (BackendSyncManager.isLoggedIn(ctx) && !BackendSyncManager.isLocalMode(ctx)) {
+                            BackendSyncManager.triggerAutoSync(ctx, force = true)
+                        }
                         withContext(Dispatchers.Main) { refreshAccountSettings() }
                     }
                 }
