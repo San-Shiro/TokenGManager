@@ -69,8 +69,8 @@ TokenG **v7.0.0** is a major milestone release featuring an all-new official **G
 
 | Artifact | File Name | Size / Hash | Target Branch |
 |---|---|---|---|
-| **Android Release APK** | `tokeng-release-7.0.0.apk` (`app-release.apk`) | 11.26 MB (11,807,536 bytes) | `release-apk` |
-| **SHA-256 Checksum** | `C36ED805690FD5B363982557B7E6B7B9A58C8E8ECCB2C6DFDBAB268997906E5E` | Verified SHA-256 | — |
+| **Android Release APK** | `tokeng-release-7.0.0.apk` (`app-release.apk`) | 11.26 MB (11,803,908 bytes) | `release-apk` |
+| **SHA-256 Checksum** | `818419BF0E16816455EAE2F3776603428F62342AEFC33076881818DEB86E9DC1` | Verified SHA-256 | — |
 | **Source Code** | Git Repository (`origin/deploy`, `origin/master`) | Tag: `v7.0.0` | `deploy`, `master` |
 
 ### Download Links
