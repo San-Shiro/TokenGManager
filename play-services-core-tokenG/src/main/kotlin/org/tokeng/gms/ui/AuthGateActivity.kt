@@ -328,7 +328,11 @@ class AuthGateActivity : AppCompatActivity() {
                     if (localAccounts.isNotEmpty()) {
                         promptSyncLocalAccounts(localAccounts)
                     } else {
-                        transitionToDashboard()
+                        transitionToDashboard {
+                            BackendSyncManager.triggerAutoSync(this, force = true) {
+                                runOnUiThread { navigateToDashboard() }
+                            }
+                        }
                     }
                 }
             } else {
@@ -394,17 +398,30 @@ class AuthGateActivity : AppCompatActivity() {
             .setTitle("Sync Local Accounts?")
             .setMessage("Found ${localAccounts.size} account(s) saved on this device. Would you like to sync them to your cloud vault now?")
             .setPositiveButton("Sync Now") { _, _ ->
-                transitionToDashboard()
-                BackendSyncManager.syncAllAccounts(this) { _, _ -> }
+                for (acc in localAccounts) {
+                    TokenDatabase.getInstance(this).updateSyncStatus(acc.email, "PENDING", 0L)
+                }
+                transitionToDashboard {
+                    BackendSyncManager.triggerAutoSync(this, force = true) {
+                        runOnUiThread { navigateToDashboard() }
+                    }
+                }
             }
             .setNegativeButton("Skip") { _, _ ->
-                transitionToDashboard()
+                for (acc in localAccounts) {
+                    TokenDatabase.getInstance(this).updateSyncStatus(acc.email, "LOCAL_ONLY", 0L)
+                }
+                transitionToDashboard {
+                    BackendSyncManager.triggerAutoSync(this, force = true) {
+                        runOnUiThread { navigateToDashboard() }
+                    }
+                }
             }
             .setCancelable(false)
             .show()
     }
 
-    private fun transitionToDashboard() {
+    private fun transitionToDashboard(onReady: (() -> Unit)? = null) {
         btnEnterLocalMode.visibility = View.GONE
         layoutAuthCard.animate().alpha(0f).setDuration(200).withEndAction {
             layoutAuthCard.visibility = View.GONE
@@ -413,9 +430,22 @@ class AuthGateActivity : AppCompatActivity() {
             layoutLoadingScreen.animate().alpha(1f).setDuration(250).start()
         }.start()
 
-        layoutLoadingScreen.postDelayed({
-            navigateToDashboard()
-        }, 500)
+        if (onReady != null) {
+            var navigated = false
+            val proceed = {
+                if (!navigated) {
+                    navigated = true
+                    navigateToDashboard()
+                }
+            }
+            // Safety timeout of 6 seconds in case of slow or unresponsive network
+            layoutLoadingScreen.postDelayed({ proceed() }, 6000)
+            onReady.invoke()
+        } else {
+            layoutLoadingScreen.postDelayed({
+                navigateToDashboard()
+            }, 500)
+        }
     }
 
     private fun returnToLocalMode() {

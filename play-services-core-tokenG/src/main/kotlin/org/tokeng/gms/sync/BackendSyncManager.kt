@@ -150,6 +150,7 @@ object BackendSyncManager {
             .remove(KEY_USER_EMAIL)
             .remove(KEY_USER_ID)
             .remove(KEY_LAST_SERVER_TIME)
+            .remove(KEY_LAST_SYNCED_USER)
             .apply()
     }
 
@@ -208,11 +209,15 @@ object BackendSyncManager {
     }
 
     fun signOut(context: Context) {
+        isSyncing.set(false)
+        syncListeners.clear()
         logout(context)
         setLocalMode(context, false)
         TokenDatabase.getInstance(context).deleteAllAccounts()
         TokenCryptoManager.wipeVault(context)
-        Log.i(TAG, "Signed out. Local vault and session credentials completely wiped.")
+        setLastServerTime(context, "1970-01-01T00:00:00Z")
+        setLastSyncedUser(context, null)
+        Log.i(TAG, "Signed out. Local vault, pull cursor, and session credentials completely wiped.")
     }
 
     fun isAutoSyncEnabled(context: Context): Boolean {
@@ -327,6 +332,24 @@ object BackendSyncManager {
         }
     }
 
+    private val isSyncing = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val syncListeners = java.util.concurrent.CopyOnWriteArrayList<(Boolean) -> Unit>()
+
+    private fun finishSync(success: Boolean) {
+        isSyncing.set(false)
+        val listeners = ArrayList(syncListeners)
+        syncListeners.clear()
+        CoroutineScope(Dispatchers.Main).launch {
+            for (listener in listeners) {
+                try {
+                    listener.invoke(success)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Sync listener error", e)
+                }
+            }
+        }
+    }
+
     @JvmStatic
     @JvmOverloads
     fun triggerAutoSync(
@@ -354,6 +377,12 @@ object BackendSyncManager {
 
         lastAutoSyncTimestamp = now
 
+        callback?.let { syncListeners.add(it) }
+        if (!isSyncing.compareAndSet(false, true)) {
+            Log.d(TAG, "triggerAutoSync: sync already in progress, registered listener and waiting")
+            return
+        }
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // 1. Push any unsynced local accounts first so new accounts are uploaded to cloud
@@ -372,14 +401,12 @@ object BackendSyncManager {
                 performPush { pushSuccess ->
                     // 2. Pull delta from cloud
                     pullDelta(context) { pullSuccess, _, _ ->
-                        callback?.invoke(pushSuccess && pullSuccess)
+                        finishSync(pushSuccess && pullSuccess)
                     }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "triggerAutoSync exception", e)
-                withContext(Dispatchers.Main) {
-                    callback?.invoke(false)
-                }
+                finishSync(false)
             }
         }
     }
@@ -457,8 +484,8 @@ object BackendSyncManager {
                         val db = TokenDatabase.getInstance(context)
                         db.deleteSyncedAccounts()
                         db.markRemainingAsLocalOnly()
-                        setLastServerTime(context, "1970-01-01T00:00:00Z")
                     }
+                    setLastServerTime(context, "1970-01-01T00:00:00Z")
                     setLastSyncedUser(context, email.trim())
                     lastAutoSyncTimestamp = 0L
 
@@ -530,8 +557,8 @@ object BackendSyncManager {
                         val db = TokenDatabase.getInstance(context)
                         db.deleteSyncedAccounts()
                         db.markRemainingAsLocalOnly()
-                        setLastServerTime(context, "1970-01-01T00:00:00Z")
                     }
+                    setLastServerTime(context, "1970-01-01T00:00:00Z")
                     setLastSyncedUser(context, email.trim())
                     lastAutoSyncTimestamp = 0L
 
@@ -646,12 +673,6 @@ object BackendSyncManager {
                 if (code in 200..299) {
                     val respText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
                     Log.d(TAG, "Instances pushed successfully: $respText")
-                    val respJson = JSONObject(respText)
-                    val serverTime = respJson.optString("server_time")
-                    if (serverTime.isNotEmpty()) {
-                        setLastServerTime(context, serverTime)
-                    }
-
                     for (acct in accounts) {
                         db.updateSyncStatus(acct.email, "SYNCED", System.currentTimeMillis())
                     }
@@ -819,6 +840,9 @@ object BackendSyncManager {
                             deviceBrand = inst.optString("device_brand", "Unknown Brand"),
                             deviceFingerprint = inst.optString("device_fingerprint", ""),
                             deviceSdk = inst.optInt("device_sdk", 34),
+                            firstName = existing?.firstName,
+                            lastName = existing?.lastName,
+                            googleUserId = existing?.googleUserId,
                             accountStatus = inst.optString("account_status", "ACTIVE"),
                             signedOutReason = inst.optString("signed_out_reason").takeIf { it.isNotEmpty() },
                             syncStatus = "SYNCED",
