@@ -48,9 +48,7 @@ class AuthGateActivity : AppCompatActivity() {
     private lateinit var progressAuth: ProgressBar
     private lateinit var tvAuthError: TextView
 
-    private lateinit var layoutReturnLocalMode: View
-    private lateinit var tvReturnLocalModeTitle: TextView
-    private lateinit var switchReturnLocalMode: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var btnEnterLocalMode: com.google.android.material.button.MaterialButton
 
     private lateinit var layoutOfflineUnlockSection: LinearLayout
     private lateinit var tilOfflinePassword: TextInputLayout
@@ -120,9 +118,7 @@ class AuthGateActivity : AppCompatActivity() {
         progressAuth = findViewById(R.id.progress_auth)
         tvAuthError = findViewById(R.id.tv_auth_error)
 
-        layoutReturnLocalMode = findViewById(R.id.layout_return_local_mode)
-        tvReturnLocalModeTitle = findViewById(R.id.tv_return_local_mode_title)
-        switchReturnLocalMode = findViewById(R.id.switch_return_local_mode)
+        btnEnterLocalMode = findViewById(R.id.btn_enter_local_mode)
 
         layoutOfflineUnlockSection = findViewById(R.id.layout_offline_unlock_section)
         tilOfflinePassword = findViewById(R.id.til_offline_password)
@@ -177,11 +173,21 @@ class AuthGateActivity : AppCompatActivity() {
             handlePrimaryAuth()
         }
 
-        val onReturnLocalModeClick = View.OnClickListener {
-            returnToLocalMode()
+        btnEnterLocalMode.setOnClickListener {
+            val isConnectingCloud = intent?.getBooleanExtra(EXTRA_CONNECT_CLOUD, false) == true
+            if (isConnectingCloud || BackendSyncManager.isLocalMode(this)) {
+                returnToLocalMode()
+            } else {
+                val pwd = etPassword.text?.toString() ?: ""
+                if (pwd.length >= 4) {
+                    enterLocalMode(pwd)
+                } else if (TokenCryptoManager.isVaultInitialized(this)) {
+                    promptLocalModePassword()
+                } else {
+                    enterLocalMode("tokeng_default_offline_key")
+                }
+            }
         }
-        layoutReturnLocalMode.setOnClickListener(onReturnLocalModeClick)
-        switchReturnLocalMode.setOnClickListener(onReturnLocalModeClick)
 
         btnUnlockOffline.setOnClickListener {
             handleOfflineUnlock()
@@ -234,13 +240,11 @@ class AuthGateActivity : AppCompatActivity() {
 
     private fun applyReachabilityState(reachability: BackendSyncManager.Reachability) {
         val isConnectingCloud = intent?.getBooleanExtra(EXTRA_CONNECT_CLOUD, false) == true
-        layoutReturnLocalMode.visibility = View.VISIBLE
+        btnEnterLocalMode.visibility = View.VISIBLE
         if (isConnectingCloud || BackendSyncManager.isLocalMode(this)) {
-            tvReturnLocalModeTitle.text = "Return to Local Mode"
-            switchReturnLocalMode.isChecked = true
+            btnEnterLocalMode.text = "Return to Local Mode"
         } else {
-            tvReturnLocalModeTitle.text = "Use Local Mode"
-            switchReturnLocalMode.isChecked = false
+            btnEnterLocalMode.text = "Use Local Mode"
         }
         layoutOfflineUnlockSection.visibility = View.GONE
         layoutOfflineBlockedSection.visibility = View.GONE
@@ -318,20 +322,14 @@ class AuthGateActivity : AppCompatActivity() {
                     showError("Failed to initialize security vault. Please try again.")
                 } else {
                     BackendSyncManager.setLocalMode(this, false)
+                    setLoading(false)
 
-                    // Fade out auth form and display sleek loading screen
-                    layoutReturnLocalMode.visibility = View.GONE
-                    layoutAuthCard.animate().alpha(0f).setDuration(200).withEndAction {
-                        layoutAuthCard.visibility = View.GONE
-                        layoutLoadingScreen.alpha = 0f
-                        layoutLoadingScreen.visibility = View.VISIBLE
-                        layoutLoadingScreen.animate().alpha(1f).setDuration(250).start()
-                    }.start()
-
-                    // Smooth transition straight to home dashboard
-                    layoutLoadingScreen.postDelayed({
-                        navigateToDashboard()
-                    }, 500)
+                    val localAccounts = TokenDatabase.getInstance(this).getAllAccounts()
+                    if (localAccounts.isNotEmpty()) {
+                        promptSyncLocalAccounts(localAccounts)
+                    } else {
+                        transitionToDashboard()
+                    }
                 }
             } else {
                 setLoading(false)
@@ -389,9 +387,39 @@ class AuthGateActivity : AppCompatActivity() {
         }
     }
 
+    private fun promptSyncLocalAccounts(localAccounts: List<org.tokeng.gms.database.TokenAccount>) {
+        if (isFinishing || isDestroyed) return
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Sync Local Accounts?")
+            .setMessage("Found ${localAccounts.size} account(s) saved on this device. Would you like to sync them to your cloud vault now?")
+            .setPositiveButton("Sync Now") { _, _ ->
+                transitionToDashboard()
+                BackendSyncManager.syncAllAccounts(this) { _, _ -> }
+            }
+            .setNegativeButton("Skip") { _, _ ->
+                transitionToDashboard()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun transitionToDashboard() {
+        btnEnterLocalMode.visibility = View.GONE
+        layoutAuthCard.animate().alpha(0f).setDuration(200).withEndAction {
+            layoutAuthCard.visibility = View.GONE
+            layoutLoadingScreen.alpha = 0f
+            layoutLoadingScreen.visibility = View.VISIBLE
+            layoutLoadingScreen.animate().alpha(1f).setDuration(250).start()
+        }.start()
+
+        layoutLoadingScreen.postDelayed({
+            navigateToDashboard()
+        }, 500)
+    }
+
     private fun returnToLocalMode() {
         BackendSyncManager.setLocalMode(this, true)
-        switchReturnLocalMode.isChecked = true
         val isConnectingCloud = intent?.getBooleanExtra(EXTRA_CONNECT_CLOUD, false) == true
         if (isConnectingCloud && !isTaskRoot) {
             finish()
@@ -458,8 +486,7 @@ class AuthGateActivity : AppCompatActivity() {
     private fun setLoading(loading: Boolean) {
         progressAuth.visibility = if (loading) View.VISIBLE else View.GONE
         btnPrimaryAuth.isEnabled = !loading
-        layoutReturnLocalMode.isEnabled = !loading
-        switchReturnLocalMode.isEnabled = !loading
+        btnEnterLocalMode.isEnabled = !loading
         if (loading) tvAuthError.visibility = View.GONE
     }
 
