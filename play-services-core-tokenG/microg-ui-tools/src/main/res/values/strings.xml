@@ -28,7 +28,7 @@
 
     <!--Settings About-->
 
-    <string name="about_microg_re" translatable="false">MicroG RE</string>
+    <string name="about_microg_re" translatable="false">TokenG</string>
     <string name="about_morphe" translatable="false">Morphe</string>
     <string name="about_morphe_description">Morphe is an open-source project designed to modify Android apps through patches</string>
     <string name="about_version_str">Version %1$s</string>

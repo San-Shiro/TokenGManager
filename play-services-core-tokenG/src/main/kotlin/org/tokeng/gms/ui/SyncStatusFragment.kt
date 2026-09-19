@@ -26,6 +26,7 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceViewHolder
+import androidx.core.widget.ImageViewCompat
 import org.tokeng.gms.R
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.color.MaterialColors
@@ -200,15 +201,7 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         }
         screen.addPreference(aboutCategory)
 
-        val versionPref = Preference(context).apply {
-            layoutResource = R.layout.preference_material_single
-            key = "pref_app_version"
-            title = "TokenG"
-            summary = "Version ${org.tokeng.gms.BuildConfig.VERSION_NAME} (Build ${org.tokeng.gms.BuildConfig.VERSION_CODE})"
-            icon = AppCompatResources.getDrawable(context, R.drawable.ic_launcher_foreground)
-            isIconSpaceReserved = true
-            isSelectable = false
-        }
+        val versionPref = AboutPreference(context)
         aboutCategory.addPreference(versionPref)
 
         // 5. SIGN OUT (Bottom Red Pill Button)
@@ -289,6 +282,36 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
                         activity?.recreate()
                     }
                 }
+            }
+        }
+    }
+
+    inner class AboutPreference(context: Context) : Preference(context) {
+        init {
+            layoutResource = R.layout.preference_material_single
+            key = "pref_app_version"
+            title = "TokenG"
+            summary = "Version ${org.tokeng.gms.BuildConfig.VERSION_NAME} (Build ${org.tokeng.gms.BuildConfig.VERSION_CODE})"
+            isIconSpaceReserved = true
+            isSelectable = false
+        }
+
+        override fun onBindViewHolder(holder: PreferenceViewHolder) {
+            super.onBindViewHolder(holder)
+            val iconView = holder.itemView.findViewById<ImageView>(android.R.id.icon)
+            if (iconView != null) {
+                // Clear any layout-level colorOnSurfaceVariant tint so the official Google colors shine untinted
+                iconView.imageTintList = null
+                ImageViewCompat.setImageTintList(iconView, null)
+
+                val size = (44 * context.resources.displayMetrics.density).toInt()
+                val lp = iconView.layoutParams
+                if (lp != null) {
+                    lp.width = size
+                    lp.height = size
+                    iconView.layoutParams = lp
+                }
+                iconView.setImageDrawable(AppCompatResources.getDrawable(context, R.mipmap.ic_launcher))
             }
         }
     }
