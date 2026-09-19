@@ -63,14 +63,19 @@ TokenG **v7.0.0** is a major milestone release featuring an all-new official **G
 - **Zero Data-Loss Vault Flow**: Hardened local vault unlocking so that failed authentication attempts or typos never inadvertently wipe or reinitialize the local security vault.
 - **Immediate Offline Handling**: Instant offline feedback guides users directly to Local Mode when network access is unavailable.
 
+### 10. 🏷️ In-App About Tab Branding & Untinted Logo
+- **Settings About Row**: Replaced the legacy preference with a dedicated `AboutPreference` class binding the official Google-colored squircle logo (`@mipmap/ic_launcher`) sized cleanly to 44dp.
+- **Removed Theme Tinting**: Cleared layout-level `colorOnSurfaceVariant` tinting so the vibrant 4-color Google palette renders untinted without being grayed out.
+- **Legacy Vector Cleanup**: Aliased `ic_launcher_foreground.xml` and `ic_microg_logo.xml` to the new Google-colored emblem and updated `about_app.xml` to use TokenG assets.
+
 ---
 
 ## 📦 Release Artifacts
 
 | Artifact | File Name | Size / Hash | Target Branch |
 |---|---|---|---|
-| **Android Release APK** | `tokeng-release-7.0.0.apk` (`app-release.apk`) | 11.26 MB (11,803,908 bytes) | `release-apk` |
-| **SHA-256 Checksum** | `818419BF0E16816455EAE2F3776603428F62342AEFC33076881818DEB86E9DC1` | Verified SHA-256 | — |
+| **Android Release APK** | `tokeng-release-7.0.0.apk` (`app-release.apk`) | 11.26 MB (11,803,244 bytes) | `release-apk` |
+| **SHA-256 Checksum** | `D1AB8B097E4875FD036DFDD7D7A2D9C304B2F6EB0E3D7CAB2E3DD6DB0773D3B4` | Verified SHA-256 | — |
 | **Source Code** | Git Repository (`origin/deploy`, `origin/master`) | Tag: `v7.0.0` | `deploy`, `master` |
 
 ### Download Links
