@@ -67,6 +67,21 @@ object BackendSyncManager {
         return DEFAULT_BACKEND_URL
     }
 
+    fun openBackendConnection(
+        urlStr: String,
+        method: String = "GET",
+        connectTimeoutMs: Int = 10000,
+        readTimeoutMs: Int = 15000
+    ): HttpURLConnection {
+        return (URL(urlStr).openConnection() as HttpURLConnection).apply {
+            requestMethod = method
+            connectTimeout = connectTimeoutMs
+            readTimeout = readTimeoutMs
+            setRequestProperty("User-Agent", "TokenG-Android/${org.tokeng.gms.BuildConfig.VERSION_NAME} (Linux; Android)")
+            setRequestProperty("Accept", "application/json")
+        }
+    }
+
     fun setBackendUrl(context: Context, url: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().putString(KEY_BACKEND_URL, url.trim().trimEnd('/')).apply()
@@ -123,7 +138,9 @@ object BackendSyncManager {
     }
 
     fun isLoggedIn(context: Context): Boolean {
-        return !getAuthToken(context).isNullOrEmpty()
+        val token = getAuthToken(context)
+        val email = getUserEmail(context)
+        return !token.isNullOrEmpty() && !email.isNullOrEmpty()
     }
 
     fun logout(context: Context) {
@@ -168,11 +185,7 @@ object BackendSyncManager {
             var conn: HttpURLConnection? = null
             var state = if (hasNet) Reachability.ONLINE_SERVER_DOWN else Reachability.OFFLINE
             try {
-                conn = (URL("${DEFAULT_BACKEND_URL}/health").openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 8000
-                    readTimeout = 8000
-                }
+                conn = openBackendConnection("${getBackendUrl(context)}/health", "GET", 8000, 8000)
                 if (conn.responseCode == 200) {
                     val body = conn.inputStream.bufferedReader().use { it.readText() }
                     val json = JSONObject(body)
@@ -181,7 +194,7 @@ object BackendSyncManager {
                     }
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Health check failed against $DEFAULT_BACKEND_URL: ${e.message}")
+                Log.w(TAG, "Health check failed against ${getBackendUrl(context)}: ${e.message}")
                 if (!hasNet) {
                     state = Reachability.OFFLINE
                 }
@@ -243,13 +256,14 @@ object BackendSyncManager {
 
         // HTTP 401 Unauthorized / Invalid Credentials
         if (lower.contains("401") || lower.contains("unauthorized") || lower.contains("invalid credential") || 
-            lower.contains("wrong password") || lower.contains("bad credentials") || lower.contains("invalid email or password")) {
+            lower.contains("wrong password") || lower.contains("bad credentials") || lower.contains("invalid email or password") ||
+            lower.contains("incorrect email or password") || lower.contains("invalid_credentials")) {
             return "Incorrect email or password. Please try again."
         }
 
         // HTTP 409 Conflict / Already Registered
         if (lower.contains("409") || lower.contains("conflict") || lower.contains("already exists") || 
-            lower.contains("duplicate") || lower.contains("user already registered")) {
+            lower.contains("duplicate") || lower.contains("user already registered") || lower.contains("user_exists")) {
             return if (isRegister) {
                 "An account with this email already exists. Please sign in instead."
             } else {
@@ -286,11 +300,16 @@ object BackendSyncManager {
             return "Server is temporarily offline (database unreachable). Please use Local Mode to access your tokens."
         }
 
-        // Clean any backend JSON error payload: e.g. {"error":"..."}
-        if (rawError.trim().startsWith("{") && rawError.contains("\"error\"")) {
+        // Clean any backend JSON error payload: e.g. {"error":"..."} or {"error":{"code":"...","message":"..."}}
+        if (rawError.trim().startsWith("{")) {
             try {
                 val json = JSONObject(rawError)
-                val msg = json.optString("error")
+                val errorVal = json.opt("error")
+                val msg = when (errorVal) {
+                    is JSONObject -> errorVal.optString("message").takeIf { it.isNotBlank() } ?: errorVal.optString("code")
+                    is String -> errorVal
+                    else -> json.optString("message").takeIf { it.isNotBlank() } ?: json.optString("error")
+                }
                 if (msg.isNotBlank()) {
                     return sanitizeErrorMessage(msg, isRegister)
                 }
@@ -373,11 +392,7 @@ object BackendSyncManager {
             var conn: HttpURLConnection? = null
             try {
                 val targetUrl = "${getBackendUrl(context)}/health"
-                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 5000
-                    readTimeout = 5000
-                }
+                conn = openBackendConnection(targetUrl, "GET", 8000, 8000)
                 val code = conn.responseCode
                 withContext(Dispatchers.Main) {
                     if (code in 200..399) {
@@ -419,10 +434,7 @@ object BackendSyncManager {
                     put("password", pass)
                 }
 
-                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 8000
-                    readTimeout = 8000
+                conn = openBackendConnection(targetUrl, "POST", 10000, 10000).apply {
                     doInput = true
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json")
@@ -495,10 +507,7 @@ object BackendSyncManager {
                     put("password", pass)
                 }
 
-                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 8000
-                    readTimeout = 8000
+                conn = openBackendConnection(targetUrl, "POST", 10000, 10000).apply {
                     doInput = true
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json")
@@ -614,10 +623,7 @@ object BackendSyncManager {
                 val targetUrl = "${getBackendUrl(context)}/api/sync/push"
                 Log.d(TAG, "Pushing ${accounts.size} instance(s) to $targetUrl...")
 
-                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 10000
-                    readTimeout = 10000
+                conn = openBackendConnection(targetUrl, "POST", 15000, 15000).apply {
                     doInput = true
                     doOutput = true
                     setRequestProperty("Content-Type", "application/json")
@@ -762,10 +768,7 @@ object BackendSyncManager {
             try {
                 val since = getLastServerTime(context)
                 val targetUrl = "${getBackendUrl(context)}/api/sync/pull?since=$since"
-                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 10000
-                    readTimeout = 10000
+                conn = openBackendConnection(targetUrl, "GET", 15000, 15000).apply {
                     val token = getAuthToken(context)
                     if (!token.isNullOrEmpty()) {
                         setRequestProperty("Authorization", "Bearer $token")
@@ -783,66 +786,58 @@ object BackendSyncManager {
 
                     val instancesArr = json.optJSONArray("instances") ?: JSONArray()
                     val db = TokenDatabase.getInstance(context)
-                    var appliedCount = 0
-                    val pulledEmails = mutableSetOf<String>()
-                    val pulledInstanceIds = mutableSetOf<String>()
+                    var applied = 0
 
                     for (i in 0 until instancesArr.length()) {
                         val inst = instancesArr.getJSONObject(i)
                         val instanceId = inst.optString("instance_id")
                         val email = inst.optString("email")
-                        if (email.isNotEmpty()) pulledEmails.add(email)
-                        if (instanceId.isNotEmpty()) pulledInstanceIds.add(instanceId)
+                        val isDeleted = inst.optBoolean("deleted", false)
 
-                        val masterToken = inst.optString("master_token")
-                        val aasToken = inst.optString("aas_token")
-                        val sid = inst.optString("sid")
-                        val lsid = inst.optString("lsid")
-                        val androidId = inst.optString("android_id")
-                        val securityToken = inst.optString("security_token")
-                        val deviceName = inst.optString("device_name", "Unknown Device")
-                        val deviceModel = inst.optString("device_model", "Unknown Model")
-                        val deviceBrand = inst.optString("device_brand", "Unknown Brand")
-                        val deviceFingerprint = inst.optString("device_fingerprint", "")
-                        val deviceSdk = inst.optInt("device_sdk", 34)
-                        val accountStatus = inst.optString("account_status", "ACTIVE")
-                        val signedOutReason = inst.optString("signed_out_reason")
-                        val deleted = inst.optBoolean("deleted", false)
-
-                        if (deleted) {
-                            db.deleteAccountByInstanceId(instanceId)
-                        } else {
-                            val account = TokenAccount(
-                                email = email,
-                                masterToken = masterToken,
-                                aasToken = if (aasToken.isNotEmpty()) aasToken else null,
-                                sid = if (sid.isNotEmpty()) sid else null,
-                                lsid = if (lsid.isNotEmpty()) lsid else null,
-                                androidId = androidId,
-                                securityToken = securityToken,
-                                deviceName = deviceName,
-                                deviceModel = deviceModel,
-                                deviceBrand = deviceBrand,
-                                deviceFingerprint = deviceFingerprint,
-                                deviceSdk = deviceSdk,
-                                syncStatus = "SYNCED",
-                                accountStatus = accountStatus,
-                                signedOutReason = if (signedOutReason.isNotEmpty()) signedOutReason else null,
-                                instanceId = instanceId
-                            )
-                            db.insertOrUpdate(account)
+                        if (isDeleted) {
+                            if (instanceId.isNotEmpty()) {
+                                db.deleteAccountByInstanceId(instanceId)
+                            } else if (email.isNotEmpty()) {
+                                db.deleteAccount(email)
+                            }
+                            applied++
+                            continue
                         }
-                        appliedCount++
+
+                        val existing = if (instanceId.isNotEmpty()) db.getAccountByInstanceId(instanceId) else db.getAccount(email)
+                        val account = TokenAccount(
+                            instanceId = if (instanceId.isNotEmpty()) instanceId else (existing?.instanceId ?: java.util.UUID.randomUUID().toString()),
+                            email = email,
+                            masterToken = inst.optString("master_token"),
+                            aasToken = inst.optString("aas_token").takeIf { it.isNotEmpty() },
+                            sid = inst.optString("sid").takeIf { it.isNotEmpty() },
+                            lsid = inst.optString("lsid").takeIf { it.isNotEmpty() },
+                            androidId = inst.optString("android_id"),
+                            securityToken = inst.optString("security_token"),
+                            deviceName = inst.optString("device_name", "Unknown Device"),
+                            deviceModel = inst.optString("device_model", "Unknown Model"),
+                            deviceBrand = inst.optString("device_brand", "Unknown Brand"),
+                            deviceFingerprint = inst.optString("device_fingerprint", ""),
+                            deviceSdk = inst.optInt("device_sdk", 34),
+                            accountStatus = inst.optString("account_status", "ACTIVE"),
+                            signedOutReason = inst.optString("signed_out_reason").takeIf { it.isNotEmpty() },
+                            syncStatus = "SYNCED",
+                            lastSyncAt = System.currentTimeMillis()
+                        )
+                        db.insertOrUpdate(account)
+                        applied++
                     }
 
                     setLastError(context, null)
+                    Log.i(TAG, "Delta sync complete: applied $applied change(s). Server time: $serverTime")
                     withContext(Dispatchers.Main) {
-                        callback(true, appliedCount, null)
+                        callback(true, applied, null)
                     }
                 } else {
                     val errText = conn.errorStream?.let { BufferedReader(InputStreamReader(it)).use { r -> r.readText() } } ?: "HTTP $code"
                     val userFriendly = sanitizeErrorMessage(errText)
                     setLastError(context, userFriendly)
+                    Log.w(TAG, "Pull delta failed ($code): $errText")
                     withContext(Dispatchers.Main) {
                         callback(false, 0, userFriendly)
                     }
@@ -850,6 +845,7 @@ object BackendSyncManager {
             } catch (e: Exception) {
                 val userFriendly = sanitizeErrorMessage(e.message)
                 setLastError(context, userFriendly)
+                Log.w(TAG, "Pull delta error: ${e.message}")
                 withContext(Dispatchers.Main) {
                     callback(false, 0, userFriendly)
                 }
@@ -870,11 +866,7 @@ object BackendSyncManager {
             var conn: HttpURLConnection? = null
             try {
                 val targetUrl = "${getBackendUrl(context)}/api/stats"
-                conn = (URL(targetUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 5000
-                    readTimeout = 5000
-                }
+                conn = openBackendConnection(targetUrl, "GET", 8000, 8000)
 
                 val code = conn.responseCode
                 if (code in 200..299) {

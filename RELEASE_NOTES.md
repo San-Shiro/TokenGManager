@@ -73,7 +73,9 @@ TokenG **v7.0.0** is a major milestone release featuring an all-new official **G
 - **Removed Explainer Subtitle**: Streamlined the Auth Gate by removing redundant footer explanatory copy under "Use Local Mode".
 - **Fixed "Sign In to Sync" Window Flash**: Fixed navigation from local mode settings by routing with `EXTRA_CONNECT_CLOUD`, preventing `AuthGateActivity` from instantly self-terminating and returning to dashboard.
 - **Disabled Pull-to-Sync in Local Mode**: Blocked swipe-to-refresh gestures and auto-sync background triggers when operating locally.
-- **Pure Transparent Logo on Auth Gate**: Replaced the shadowed squircle card on `AuthGateActivity` with a crisp, transparent PNG (`@drawable/ic_tokeng_logo`) free of any white square or elevation shadows.
+### 12. 🛡️ Cloudflare WAF Compatibility & Return to Local Mode Switch
+- **Cloudflare WAF User-Agent Requirement**: Resolved the "Server Unavailable" (`Cloud Service Temporarily Offline`) error caused by Cloudflare rejecting client requests lacking a custom `User-Agent`. Implemented `BackendSyncManager.openBackendConnection()` setting `User-Agent: TokenG-Android/7.0.0 (Linux; Android)` across all API endpoints (`/health`, `/api/auth/register`, `/api/auth/login`, `/api/sync/pull`, `/api/sync/push`, `/api/stats`).
+- **Return to Local Mode Switch**: Replaced the "Use Local Mode" button with a sleek Material 3 "Return to Local Mode" switch card. Seamlessly returns users to local mode without redundant password prompts or re-encrypting the vault.
 
 ---
 
@@ -81,8 +83,8 @@ TokenG **v7.0.0** is a major milestone release featuring an all-new official **G
 
 | Artifact | File Name | Size / Hash | Target Branch |
 |---|---|---|---|
-| **Android Release APK** | `tokeng-release-7.0.0.apk` (`app-release.apk`) | 11.41 MB (11,963,208 bytes) | `release-apk` |
-| **SHA-256 Checksum** | `CFF28C54CF1053227DFEDDA25D4E27CE6B5FA58124EE02A3A45C1F6282BC50B8` | Verified SHA-256 | — |
+| **Android Release APK** | `tokeng-release-7.0.0.apk` (`app-release.apk`) | 11.41 MB (11,963,504 bytes) | `release-apk` |
+| **SHA-256 Checksum** | `565883C025CDF49D9D7201CBDAEAE39B07BF5836017849E0B7A8870670C7AA3E` | Verified SHA-256 | — |
 | **Source Code** | Git Repository (`origin/deploy`, `origin/master`) | Tag: `v7.0.0` | `deploy`, `master` |
 
 ### Download Links

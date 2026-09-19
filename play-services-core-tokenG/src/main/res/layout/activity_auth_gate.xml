@@ -275,37 +275,66 @@
                  android:textColor="?android:attr/textColorSecondary" />
          </LinearLayout>
 
-        <!-- Local Mode Section (Permanently Visible) -->
+        <!-- Return to Local Mode Switch Card -->
         <LinearLayout
-            android:id="@+id/layout_local_mode_section"
+            android:id="@+id/layout_return_local_mode"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:gravity="center_horizontal"
-            android:orientation="vertical"
-            android:visibility="visible">
+            android:layout_marginTop="18dp"
+            android:background="@drawable/card_surface_bg"
+            android:clickable="true"
+            android:elevation="2dp"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="12dp">
 
-            <TextView
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="Local Mode"
+                android:src="@drawable/ic_privacy"
+                app:tint="?attr/colorPrimary" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_return_local_mode_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="Return to Local Mode"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_return_local_mode_desc"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="Use vault only on this device without cloud sync"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/switch_return_local_mode"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="────────  OR  ────────"
-                android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="?android:attr/textColorSecondary" />
+                android:clickable="false"
+                android:focusable="false" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_enter_local_mode"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="14dp"
-                android:fontFamily="sans-serif-medium"
-                android:text="Use Local Mode"
-                android:textAllCaps="false"
-                android:textColor="?attr/colorPrimary"
-                app:cornerRadius="26dp"
-                app:icon="@drawable/ic_privacy"
-                app:iconGravity="textStart"
-                app:iconTint="?attr/colorPrimary" />
         </LinearLayout>
 
         <!-- Offline Unlock Section (Displayed when Completely Offline) -->

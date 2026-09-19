@@ -48,8 +48,9 @@ class AuthGateActivity : AppCompatActivity() {
     private lateinit var progressAuth: ProgressBar
     private lateinit var tvAuthError: TextView
 
-    private lateinit var layoutLocalModeSection: LinearLayout
-    private lateinit var btnEnterLocalMode: Button
+    private lateinit var layoutReturnLocalMode: View
+    private lateinit var tvReturnLocalModeTitle: TextView
+    private lateinit var switchReturnLocalMode: com.google.android.material.materialswitch.MaterialSwitch
 
     private lateinit var layoutOfflineUnlockSection: LinearLayout
     private lateinit var tilOfflinePassword: TextInputLayout
@@ -119,8 +120,9 @@ class AuthGateActivity : AppCompatActivity() {
         progressAuth = findViewById(R.id.progress_auth)
         tvAuthError = findViewById(R.id.tv_auth_error)
 
-        layoutLocalModeSection = findViewById(R.id.layout_local_mode_section)
-        btnEnterLocalMode = findViewById(R.id.btn_enter_local_mode)
+        layoutReturnLocalMode = findViewById(R.id.layout_return_local_mode)
+        tvReturnLocalModeTitle = findViewById(R.id.tv_return_local_mode_title)
+        switchReturnLocalMode = findViewById(R.id.switch_return_local_mode)
 
         layoutOfflineUnlockSection = findViewById(R.id.layout_offline_unlock_section)
         tilOfflinePassword = findViewById(R.id.til_offline_password)
@@ -175,14 +177,11 @@ class AuthGateActivity : AppCompatActivity() {
             handlePrimaryAuth()
         }
 
-        btnEnterLocalMode.setOnClickListener {
-            val pwd = etPassword.text?.toString() ?: ""
-            if (pwd.length >= 4) {
-                enterLocalMode(pwd)
-            } else {
-                promptLocalModePassword()
-            }
+        val onReturnLocalModeClick = View.OnClickListener {
+            returnToLocalMode()
         }
+        layoutReturnLocalMode.setOnClickListener(onReturnLocalModeClick)
+        switchReturnLocalMode.setOnClickListener(onReturnLocalModeClick)
 
         btnUnlockOffline.setOnClickListener {
             handleOfflineUnlock()
@@ -235,8 +234,14 @@ class AuthGateActivity : AppCompatActivity() {
 
     private fun applyReachabilityState(reachability: BackendSyncManager.Reachability) {
         val isConnectingCloud = intent?.getBooleanExtra(EXTRA_CONNECT_CLOUD, false) == true
-        // Local Mode is available across all network states unless user came specifically to connect to cloud
-        layoutLocalModeSection.visibility = if (isConnectingCloud) View.GONE else View.VISIBLE
+        layoutReturnLocalMode.visibility = View.VISIBLE
+        if (isConnectingCloud || BackendSyncManager.isLocalMode(this)) {
+            tvReturnLocalModeTitle.text = "Return to Local Mode"
+            switchReturnLocalMode.isChecked = true
+        } else {
+            tvReturnLocalModeTitle.text = "Use Local Mode"
+            switchReturnLocalMode.isChecked = false
+        }
         layoutOfflineUnlockSection.visibility = View.GONE
         layoutOfflineBlockedSection.visibility = View.GONE
 
@@ -315,7 +320,7 @@ class AuthGateActivity : AppCompatActivity() {
                     BackendSyncManager.setLocalMode(this, false)
 
                     // Fade out auth form and display sleek loading screen
-                    layoutLocalModeSection.visibility = View.GONE
+                    layoutReturnLocalMode.visibility = View.GONE
                     layoutAuthCard.animate().alpha(0f).setDuration(200).withEndAction {
                         layoutAuthCard.visibility = View.GONE
                         layoutLoadingScreen.alpha = 0f
@@ -384,6 +389,26 @@ class AuthGateActivity : AppCompatActivity() {
         }
     }
 
+    private fun returnToLocalMode() {
+        BackendSyncManager.setLocalMode(this, true)
+        switchReturnLocalMode.isChecked = true
+        val isConnectingCloud = intent?.getBooleanExtra(EXTRA_CONNECT_CLOUD, false) == true
+        if (isConnectingCloud && !isTaskRoot) {
+            finish()
+        } else if (TokenCryptoManager.isUnlocked()) {
+            navigateToDashboard()
+        } else {
+            val pwd = etPassword.text?.toString() ?: ""
+            if (pwd.length >= 4) {
+                enterLocalMode(pwd)
+            } else if (TokenCryptoManager.isVaultInitialized(this)) {
+                promptLocalModePassword()
+            } else {
+                enterLocalMode("tokeng_default_offline_key")
+            }
+        }
+    }
+
     private fun enterLocalMode(password: String) {
         val pwdChars = password.toCharArray()
         try {
@@ -433,7 +458,8 @@ class AuthGateActivity : AppCompatActivity() {
     private fun setLoading(loading: Boolean) {
         progressAuth.visibility = if (loading) View.VISIBLE else View.GONE
         btnPrimaryAuth.isEnabled = !loading
-        btnEnterLocalMode.isEnabled = !loading
+        layoutReturnLocalMode.isEnabled = !loading
+        switchReturnLocalMode.isEnabled = !loading
         if (loading) tvAuthError.visibility = View.GONE
     }
 
