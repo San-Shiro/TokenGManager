@@ -39,7 +39,7 @@ TokenG manages Google authentication sessions without adding accounts to Android
 Output:
 
 ```text
-play-services-core-tokenG/build/outputs/apk/default/release/tokeng-release-6.2.0.apk
+play-services-core-tokenG/build/outputs/apk/default/release/tokeng-release-7.0.0.apk
 ```
 
 ## Backend Service (`tokeng-server`)
@@ -62,5 +62,5 @@ Health check: `http://<host>:8088/health`
 ## Install App
 
 ```sh
-adb install -r play-services-core-tokenG/build/outputs/apk/default/release/tokeng-release-6.2.0.apk
+adb install -r play-services-core-tokenG/build/outputs/apk/default/release/tokeng-release-7.0.0.apk
 ```

@@ -18,6 +18,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -218,41 +219,37 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun applyReachabilityState(reachability: BackendSyncManager.Reachability) {
+        // Local Mode is permanently available across all network states
+        layoutLocalModeSection.visibility = View.VISIBLE
+        layoutOfflineUnlockSection.visibility = View.GONE
+        layoutOfflineBlockedSection.visibility = View.GONE
+
         when (reachability) {
             BackendSyncManager.Reachability.ONLINE_SERVER_UP -> {
                 tvNetworkStatus.visibility = View.GONE
                 layoutAuthCard.visibility = View.VISIBLE
-                layoutLocalModeSection.visibility = View.GONE
-                layoutOfflineUnlockSection.visibility = View.GONE
-                layoutOfflineBlockedSection.visibility = View.GONE
             }
             BackendSyncManager.Reachability.ONLINE_SERVER_DOWN -> {
-                tvNetworkStatus.text = "● Server Temporarily Offline"
+                tvNetworkStatus.text = "● Cloud Service Temporarily Offline"
                 tvNetworkStatus.setTextColor(0xFFF59E0B.toInt())
                 tvNetworkStatus.visibility = View.VISIBLE
                 layoutAuthCard.visibility = View.VISIBLE
-                layoutLocalModeSection.visibility = View.VISIBLE
-                layoutOfflineUnlockSection.visibility = View.GONE
-                layoutOfflineBlockedSection.visibility = View.GONE
             }
             BackendSyncManager.Reachability.OFFLINE -> {
                 tvNetworkStatus.text = "● No Internet Connection"
                 tvNetworkStatus.setTextColor(0xFFEF4444.toInt())
                 tvNetworkStatus.visibility = View.VISIBLE
                 layoutAuthCard.visibility = View.VISIBLE
-                layoutLocalModeSection.visibility = View.GONE
-                layoutOfflineBlockedSection.visibility = View.GONE
-
-                if (TokenCryptoManager.isVaultInitialized(this)) {
-                    layoutOfflineUnlockSection.visibility = View.VISIBLE
-                } else {
-                    layoutOfflineUnlockSection.visibility = View.GONE
-                }
             }
         }
     }
 
     private fun handlePrimaryAuth() {
+        if (currentReachability == BackendSyncManager.Reachability.OFFLINE) {
+            showError("No internet connection. Please use Local Mode to manage tokens offline.")
+            return
+        }
+
         val email = etEmail.text?.toString()?.trim() ?: ""
         val password = etPassword.text?.toString() ?: ""
 
@@ -302,6 +299,7 @@ class AuthGateActivity : AppCompatActivity() {
                     BackendSyncManager.setLocalMode(this, false)
 
                     // Fade out auth form and display sleek loading screen
+                    layoutLocalModeSection.visibility = View.GONE
                     layoutAuthCard.animate().alpha(0f).setDuration(200).withEndAction {
                         layoutAuthCard.visibility = View.GONE
                         layoutLoadingScreen.alpha = 0f
@@ -328,8 +326,17 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun promptLocalModePassword() {
+        val isInitialized = TokenCryptoManager.isVaultInitialized(this)
+        val title = if (isInitialized) "Unlock Local Vault" else "Create Local Vault"
+        val message = if (isInitialized) {
+            "Enter your vault password to access your local tokens."
+        } else {
+            "Set a password (minimum 4 characters) to encrypt and protect your local tokens on this device."
+        }
+        val btnLabel = if (isInitialized) "Unlock Vault" else "Create & Enter"
+
         val til = TextInputLayout(this).apply {
-            hint = "Local Vault Password"
+            hint = if (isInitialized) "Local Vault Password" else "Set Vault Password"
             val pad = (20 * resources.displayMetrics.density).toInt()
             setPadding(pad, pad / 2, pad, pad / 2)
             endIconMode = TextInputLayout.END_ICON_PASSWORD_TOGGLE
@@ -339,41 +346,45 @@ class AuthGateActivity : AppCompatActivity() {
         }
         til.addView(input)
 
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Enter Local Mode")
-            .setMessage("Server is temporarily offline. Access and manage your tokens locally on this device.")
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
             .setView(til)
-            .setPositiveButton("Enter Local Mode") { _, _ ->
-                val password = input.text?.toString() ?: ""
-                if (password.length < 4) {
-                    showError("Local password must be at least 4 characters.")
-                    return@setPositiveButton
-                }
-                enterLocalMode(password)
-            }
+            .setPositiveButton(btnLabel, null)
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+            val password = input.text?.toString() ?: ""
+            if (password.length < 4) {
+                til.error = "Password must be at least 4 characters."
+                return@setOnClickListener
+            }
+            til.error = null
+            dialog.dismiss()
+            enterLocalMode(password)
+        }
     }
 
     private fun enterLocalMode(password: String) {
         val pwdChars = password.toCharArray()
-        val unlocked = if (TokenCryptoManager.isVaultInitialized(this)) {
-            if (TokenCryptoManager.unlockVault(this, pwdChars)) {
-                true
+        try {
+            val unlocked = if (TokenCryptoManager.isVaultInitialized(this)) {
+                TokenCryptoManager.unlockVault(this, pwdChars)
             } else {
-                // If previous session vault had a different salt/password, re-initialize with new password
-                TokenCryptoManager.wipeVault(this)
                 TokenCryptoManager.initializeVault(this, pwdChars)
             }
-        } else {
-            TokenCryptoManager.initializeVault(this, pwdChars)
-        }
 
-        if (unlocked) {
-            BackendSyncManager.setLocalMode(this, true)
-            navigateToDashboard()
-        } else {
-            showError("Unable to initialize local security vault. Please try again.")
+            if (unlocked) {
+                BackendSyncManager.setLocalMode(this, true)
+                navigateToDashboard()
+            } else {
+                showError("Incorrect password. Unable to unlock local vault.")
+            }
+        } finally {
+            pwdChars.fill('\u0000')
         }
     }
 
@@ -406,6 +417,7 @@ class AuthGateActivity : AppCompatActivity() {
     private fun setLoading(loading: Boolean) {
         progressAuth.visibility = if (loading) View.VISIBLE else View.GONE
         btnPrimaryAuth.isEnabled = !loading
+        btnEnterLocalMode.isEnabled = !loading
         if (loading) tvAuthError.visibility = View.GONE
     }
 

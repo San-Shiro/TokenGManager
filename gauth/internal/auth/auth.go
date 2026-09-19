@@ -49,7 +49,7 @@ func ExchangeOAuthForMaster(cfg *config.Config, oauthToken string) (*Response, e
 		"device_country":               {"us"},
 		"operatorCountry":              {"us"},
 		"lang":                         {"en_US"},
-		"google_play_services_version": {"255034001"},
+		"google_play_services_version": {"255035000"},
 		"accountType":                  {"HOSTED_OR_GOOGLE"},
 		"service":                      {"ac2dm"},
 		// MicroG does NOT send 'source' in retrieveRtToken
@@ -80,7 +80,7 @@ func FetchServiceToken(cfg *config.Config, scope, appPackage, appSig string) (*R
 		"device_country":               {"us"},
 		"operatorCountry":              {"us"},
 		"lang":                         {"en_US"},
-		"google_play_services_version": {"255034001"},
+		"google_play_services_version": {"255035000"},
 		"accountType":                  {"HOSTED_OR_GOOGLE"},
 		"Email":                        {cfg.Email},
 		"service":                      {scope},

@@ -5,7 +5,7 @@
   -->
 <resources>
     <!--app icon background-->
-    <color name="ic_launcher_background">#1E2631</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
 
     <!--Material 3 Dark Mode Palette-->
     <color name="md_theme_primary">#91B3FA</color>

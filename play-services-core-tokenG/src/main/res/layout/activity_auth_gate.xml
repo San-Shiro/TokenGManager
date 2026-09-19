@@ -276,7 +276,7 @@
                  android:textColor="?android:attr/textColorSecondary" />
          </LinearLayout>
 
-        <!-- Local Mode Fallback Section (Displayed when Server is Down) -->
+        <!-- Local Mode Section (Permanently Visible) -->
         <LinearLayout
             android:id="@+id/layout_local_mode_section"
             android:layout_width="match_parent"
@@ -284,7 +284,7 @@
             android:layout_marginTop="20dp"
             android:gravity="center_horizontal"
             android:orientation="vertical"
-            android:visibility="gone">
+            android:visibility="visible">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -300,17 +300,21 @@
                 android:layout_height="52dp"
                 android:layout_marginTop="14dp"
                 android:fontFamily="sans-serif-medium"
-                android:text="Enter Local Mode"
+                android:text="Use Local Mode"
                 android:textAllCaps="false"
                 android:textColor="?attr/colorPrimary"
-                app:cornerRadius="26dp" />
+                app:cornerRadius="26dp"
+                app:icon="@drawable/ic_privacy"
+                app:iconGravity="textStart"
+                app:iconTint="?attr/colorPrimary" />
 
             <TextView
+                android:id="@+id/tv_local_mode_subtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:gravity="center"
-                android:text="Server is temporarily down. Manage tokens locally on this device."
+                android:text="Use TokenG only on this device without cloud sync."
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="?android:attr/textColorSecondary" />
         </LinearLayout>
@@ -420,7 +424,7 @@
             android:layout_marginTop="28dp"
             android:layout_marginBottom="16dp"
             android:gravity="center"
-            android:text="TokenG v6.2.0"
+            android:text="TokenG v7.0.0"
             android:textAppearance="?attr/textAppearanceBodySmall"
             android:textColor="?android:attr/textColorSecondary"
             android:alpha="0.7" />

@@ -17,7 +17,7 @@ import (
 	"github.com/San-Shiro/tokeng-server/internal/store"
 )
 
-const Version = "6.2.0"
+const Version = "7.0.0"
 
 func main() {
 	healthCheckFlag := flag.Bool("healthcheck", false, "run healthcheck query against localhost and exit")
