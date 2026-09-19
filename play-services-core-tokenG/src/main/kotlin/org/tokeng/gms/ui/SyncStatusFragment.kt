@@ -98,9 +98,16 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
         if (BackendSyncManager.isLocalMode(context)) {
             val localModeBanner = Preference(context).apply {
                 layoutResource = R.layout.preference_material_information
-                isSelectable = false
+                isSelectable = true
                 title = "Local Mode Active"
-                summary = "Vault is operating locally on this device. Sign in to enable cloud sync."
+                summary = "Vault is operating locally on this device. Tap to sign in and enable cloud sync."
+                setOnPreferenceClickListener {
+                    val intent = Intent(context, AuthGateActivity::class.java).apply {
+                        putExtra(AuthGateActivity.EXTRA_CONNECT_CLOUD, true)
+                    }
+                    startActivity(intent)
+                    true
+                }
             }
             screen.addPreference(localModeBanner)
         }
@@ -126,7 +133,9 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
                 icon = AppCompatResources.getDrawable(context, R.drawable.ic_accounts)
                 isIconSpaceReserved = true
                 setOnPreferenceClickListener {
-                    val intent = Intent(context, AuthGateActivity::class.java)
+                    val intent = Intent(context, AuthGateActivity::class.java).apply {
+                        putExtra(AuthGateActivity.EXTRA_CONNECT_CLOUD, true)
+                    }
                     startActivity(intent)
                     true
                 }
@@ -151,11 +160,19 @@ class SyncStatusFragment : PreferenceFragmentCompat() {
                 icon = AppCompatResources.getDrawable(context, R.drawable.ic_sync)
                 isIconSpaceReserved = true
                 setOnPreferenceClickListener {
-                    view?.let { v -> Snackbar.make(v, "Syncing local accounts...", Snackbar.LENGTH_SHORT).show() }
-                    BackendSyncManager.syncAccountsBatch(context, localAccounts) { success, err ->
-                        val msg = if (success) "✓ Successfully synced local accounts!" else BackendSyncManager.sanitizeErrorMessage(err)
-                        view?.let { v -> Snackbar.make(v, msg, Snackbar.LENGTH_LONG).show() }
-                        refreshSyncDashboard(force = true)
+                    if (BackendSyncManager.isLocalMode(context) || !BackendSyncManager.isLoggedIn(context)) {
+                        view?.let { v -> Snackbar.make(v, "Please sign in to cloud first to sync accounts", Snackbar.LENGTH_LONG).show() }
+                        val intent = Intent(context, AuthGateActivity::class.java).apply {
+                            putExtra(AuthGateActivity.EXTRA_CONNECT_CLOUD, true)
+                        }
+                        startActivity(intent)
+                    } else {
+                        view?.let { v -> Snackbar.make(v, "Syncing local accounts...", Snackbar.LENGTH_SHORT).show() }
+                        BackendSyncManager.syncAccountsBatch(context, localAccounts) { success, err ->
+                            val msg = if (success) "✓ Successfully synced local accounts!" else BackendSyncManager.sanitizeErrorMessage(err)
+                            view?.let { v -> Snackbar.make(v, msg, Snackbar.LENGTH_LONG).show() }
+                            refreshSyncDashboard(force = true)
+                        }
                     }
                     true
                 }

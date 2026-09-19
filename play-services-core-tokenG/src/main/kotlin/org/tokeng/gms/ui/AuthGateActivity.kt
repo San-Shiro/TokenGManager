@@ -65,6 +65,11 @@ class AuthGateActivity : AppCompatActivity() {
     private var currentReachability = BackendSyncManager.Reachability.OFFLINE
     private var isNavigating = false
 
+    companion object {
+        const val EXTRA_CONNECT_CLOUD = "org.tokeng.gms.extra.CONNECT_CLOUD"
+        const val EXTRA_START_REGISTER = "org.tokeng.gms.extra.START_REGISTER"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeManager.applyTheme(this)
         super.onCreate(savedInstanceState)
@@ -76,14 +81,24 @@ class AuthGateActivity : AppCompatActivity() {
         startEntranceAnimations()
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     override fun onResume() {
         super.onResume()
-        // If already unlocked, proceed straight into TokenManager
-        if (BackendSyncManager.isUnlocked(this)) {
+        val isConnectingCloud = intent?.getBooleanExtra(EXTRA_CONNECT_CLOUD, false) == true
+        // If already unlocked and not explicitly requested to connect to cloud, proceed straight into TokenManager
+        if (BackendSyncManager.isUnlocked(this) && !isConnectingCloud) {
             navigateToDashboard()
             return
         }
         isNavigating = false
+        if (intent?.getBooleanExtra(EXTRA_START_REGISTER, false) == true && !isRegisterMode) {
+            isRegisterMode = true
+            animateTabSwitch(toRegister = true)
+        }
         checkConnectivity()
     }
 
@@ -219,8 +234,9 @@ class AuthGateActivity : AppCompatActivity() {
     }
 
     private fun applyReachabilityState(reachability: BackendSyncManager.Reachability) {
-        // Local Mode is permanently available across all network states
-        layoutLocalModeSection.visibility = View.VISIBLE
+        val isConnectingCloud = intent?.getBooleanExtra(EXTRA_CONNECT_CLOUD, false) == true
+        // Local Mode is available across all network states unless user came specifically to connect to cloud
+        layoutLocalModeSection.visibility = if (isConnectingCloud) View.GONE else View.VISIBLE
         layoutOfflineUnlockSection.visibility = View.GONE
         layoutOfflineBlockedSection.visibility = View.GONE
 

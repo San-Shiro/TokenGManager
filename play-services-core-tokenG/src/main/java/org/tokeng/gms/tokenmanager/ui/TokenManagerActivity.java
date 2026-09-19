@@ -51,6 +51,10 @@ public class TokenManagerActivity extends AppCompatActivity {
         if (swipeRefresh != null) {
             swipeRefresh.setColorSchemeResources(R.color.md_theme_primary);
             swipeRefresh.setOnRefreshListener(() -> {
+                if (org.tokeng.gms.sync.BackendSyncManager.INSTANCE.isLocalMode(this)) {
+                    swipeRefresh.setRefreshing(false);
+                    return;
+                }
                 org.tokeng.gms.sync.BackendSyncManager.INSTANCE.triggerAutoSync(this, true, (success) -> {
                     swipeRefresh.setRefreshing(false);
                     refreshCurrentDashboard();
@@ -81,6 +85,17 @@ public class TokenManagerActivity extends AppCompatActivity {
             return;
         }
 
+        boolean isLocalMode = org.tokeng.gms.sync.BackendSyncManager.INSTANCE.isLocalMode(this);
+        if (swipeRefresh != null) {
+            swipeRefresh.setEnabled(!isLocalMode);
+            swipeRefresh.setRefreshing(false);
+        }
+
+        if (isLocalMode) {
+            refreshCurrentDashboard();
+            return;
+        }
+
         // Auto-sync on app open / resume (force sync to catch newly added accounts immediately)
         org.tokeng.gms.sync.BackendSyncManager.INSTANCE.triggerAutoSync(this, true, (success) -> {
             if (Boolean.TRUE.equals(success)) {
@@ -93,8 +108,9 @@ public class TokenManagerActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Debounced auto-sync on app close / background
-        if (org.tokeng.gms.sync.BackendSyncManager.INSTANCE.isUnlocked(this)) {
+        // Debounced auto-sync on app close / background (only when in cloud mode)
+        if (org.tokeng.gms.sync.BackendSyncManager.INSTANCE.isUnlocked(this) &&
+            !org.tokeng.gms.sync.BackendSyncManager.INSTANCE.isLocalMode(this)) {
             org.tokeng.gms.sync.BackendSyncManager.INSTANCE.triggerAutoSync(this, false, null);
         }
     }

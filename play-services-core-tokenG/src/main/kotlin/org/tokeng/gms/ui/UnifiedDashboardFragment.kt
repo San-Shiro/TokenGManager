@@ -231,8 +231,9 @@ class UnifiedDashboardFragment : PreferenceFragmentCompat() {
             textDeviceInfo?.text = "${account.deviceName} (${account.deviceModel}) • Android SDK ${account.deviceSdk}"
             textMasterToken?.text = "Master AAS: $obfuscatedToken"
 
-            // Mark unsynced accounts with a red caution icon; do NOT mark accounts that are synced
-            if (account.syncStatus != "SYNCED") {
+            // In local mode, do not show sync pending icon; only show caution icon for unsynced accounts in cloud mode
+            val isLocalMode = BackendSyncManager.isLocalMode(context)
+            if (!isLocalMode && account.syncStatus != "SYNCED") {
                 syncBadge?.visibility = View.VISIBLE
             } else {
                 syncBadge?.visibility = View.GONE
